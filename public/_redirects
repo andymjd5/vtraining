@@ -1,0 +1,6 @@
+/* /index.html 200
+
+# Specific routes
+/super-admin/* /index.html 200
+/company-admin/* /index.html 200
+/dashboard/* /index.html 200

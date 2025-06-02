@@ -1,0 +1,254 @@
+import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Building, Users, BarChart, Settings, Search, Download, MoreVertical } from 'lucide-react';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { Company, UserRole } from '../../types';
+
+// Extension du type Company pour les nouvelles propriétés
+type ExtendedCompany = Company & {
+  agentCount: number;
+  trainingCount: number;
+  status: 'active' | 'inactive';
+  createdAt: Date;
+};
+
+const CompanyManagement = () => {
+  const [companies, setCompanies] = useState<ExtendedCompany[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const fetchCompanies = async () => {
+    try {
+      const companiesRef = collection(db, 'companies');
+      const snapshot = await getDocs(companiesRef);
+      
+      // Mock des données manquantes pour la démo
+      const companiesData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || '',
+          contactEmail: data.contactEmail || '',
+          logoUrl: data.logoUrl || null,
+          // Données mockées
+          agentCount: Math.floor(Math.random() * 100),
+          trainingCount: Math.floor(Math.random() * 50),
+          status: Math.random() > 0.3 ? 'active' : 'inactive',
+          createdAt: new Date(Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000))
+        } as ExtendedCompany;
+      });
+      
+      setCompanies(companiesData);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filtrage des entreprises
+  const filteredCompanies = useMemo(() => {
+    return companies.filter(company => 
+      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      company.status.includes(searchTerm.toLowerCase())
+    );
+  }, [companies, searchTerm]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">Company Management</h1>
+        <Button leftIcon={<Building className="h-5 w-5" />}>
+          Add Company
+        </Button>
+      </div>
+
+      <CompanyTable 
+        companies={filteredCompanies} 
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+      />
+    </div>
+  );
+};
+
+// Composant Tableau réutilisable
+const CompanyTable = ({ 
+  companies, 
+  searchTerm,
+  onSearchChange 
+}: { 
+  companies: ExtendedCompany[];
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
+}) => {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      {/* Barre d'outils */}
+      <div className="px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row justify-between gap-4">
+        <div className="relative w-full md:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name or status..."
+            className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
+        
+        <div className="flex space-x-2">
+          <Button variant="outlined" leftIcon={<Download className="h-4 w-4" />}>
+            CSV
+          </Button>
+          <Button variant="outlined" leftIcon={<Download className="h-4 w-4" />}>
+            PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* Tableau responsive */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <TableHeader>Name</TableHeader>
+              <TableHeader>Contact Email</TableHeader>
+              <TableHeader>Agents</TableHeader>
+              <TableHeader>Trainings</TableHeader>
+              <TableHeader>Status</TableHeader>
+              <TableHeader>Created At</TableHeader>
+              <TableHeader>Actions</TableHeader>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {companies.map((company) => (
+              <TableRow key={company.id} company={company} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {companies.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          No companies found
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Composant d'en-tête de tableau
+const TableHeader = ({ children }: { children: React.ReactNode }) => (
+  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+    {children}
+  </th>
+);
+
+// Composant de ligne de tableau
+const TableRow = ({ company }: { company: ExtendedCompany }) => {
+  // Formatage de la date
+  const formattedDate = company.createdAt.toLocaleDateString('fr-FR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="flex items-center">
+          {company.logoUrl ? (
+            <img
+              src={company.logoUrl}
+              alt={`${company.name} logo`}
+              className="h-10 w-10 object-contain rounded mr-3"
+            />
+          ) : (
+            <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center mr-3">
+              <Building className="h-5 w-5 text-gray-400" />
+            </div>
+          )}
+          <span className="font-medium text-gray-900">{company.name}</span>
+        </div>
+      </td>
+      
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {company.contactEmail}
+      </td>
+      
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        {company.agentCount}
+      </td>
+      
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        {company.trainingCount}
+      </td>
+      
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+          company.status === 'active' 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {company.status}
+        </span>
+      </td>
+      
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {formattedDate}
+      </td>
+      
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+        <div className="dropdown relative">
+          <Button variant="ghost" className="p-1">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+          
+          <div className="dropdown-menu absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 hidden [.dropdown:hover_&]:block">
+            <div className="py-1">
+              <ActionItem>View</ActionItem>
+              <ActionItem>Edit</ActionItem>
+              <ActionItem>Delete</ActionItem>
+              <ActionItem>
+                {company.status === 'active' ? 'Deactivate' : 'Activate'}
+              </ActionItem>
+              <ActionItem>Manage Admins</ActionItem>
+              <ActionItem>Export</ActionItem>
+              <ActionItem>View Reports</ActionItem>
+              <ActionItem>View Agents</ActionItem>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+};
+
+// Composant d'item d'action
+const ActionItem = ({ children }: { children: React.ReactNode }) => (
+  <a 
+    href="#" 
+    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+  >
+    {children}
+  </a>
+);
+
+export default CompanyManagement;
