@@ -22,6 +22,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useCompany() {
+function useCompany() {
   return useContext(CompanyContext);
 }

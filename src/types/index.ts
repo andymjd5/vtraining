@@ -16,7 +16,7 @@ export interface User {
   updatedAt: Date;
 }
 
-export interface Company {
+interface Company {
   id: string;
   name: string;
   urlSlug: string;
@@ -29,7 +29,7 @@ export interface Company {
   updatedAt: Date;
 }
 
-export interface LoginCredentials {
+interface LoginCredentials {
   email: string;
   password: string;
   companyId?: string;
