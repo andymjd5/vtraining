@@ -1,0 +1,8 @@
+node_modules
+dist
+.vscode
+public/videos
+public/uploads
+coverage
+e2e
+src/scripts
