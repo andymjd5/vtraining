@@ -24,6 +24,7 @@ const AdminUserManagement = () => {
       
       // Utilisation du service Firebase
       const data = await userService.getAllUsers();
+      console.log('Données récupérées:', data); // Debug
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -55,10 +56,7 @@ const AdminUserManagement = () => {
 
     try {
       // Note: Firebase Auth nécessite une Cloud Function pour supprimer des utilisateurs
-      // Vous devrez implémenter cette fonctionnalité côté serveur
       console.log('Delete user:', userId);
-      // await userService.deleteUser(userId);
-      // setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
     } catch (error) {
       console.error('Error deleting user:', error);
       setError('Erreur lors de la suppression de l\'utilisateur');
@@ -75,22 +73,34 @@ const AdminUserManagement = () => {
     }
   };
 
+  // FIX 1: Améliorer la logique de filtrage pour gérer les différents formats de noms
   const filteredUsers = users.filter(user => {
+    // Gérer les différents formats de noms (name, fullName, displayName)
+    const userName = user.name || user.fullName || user.displayName || '';
+    const userEmail = user.email || '';
+    
     const matchesSearch = 
-      user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      userEmail.toLowerCase().includes(searchQuery.toLowerCase());
     
     if (selectedTab === 'all') return matchesSearch;
-    return matchesSearch && user.role === selectedTab.toUpperCase();
+    
+    // FIX 2: Vérifier le rôle correctement (gérer les cas où le rôle peut être en minuscules ou majuscules)
+    const userRole = user.role?.toUpperCase();
+    const selectedRole = selectedTab.toUpperCase();
+    
+    return matchesSearch && userRole === selectedRole;
   });
 
   const getRoleColor = (role: UserRole) => {
-    switch (role) {
-      case UserRole.SUPER_ADMIN:
+    // FIX 3: Gérer les rôles même s'ils sont en minuscules
+    const normalizedRole = role?.toUpperCase();
+    switch (normalizedRole) {
+      case 'SUPER_ADMIN':
         return 'bg-primary-100 text-primary-800';
-      case UserRole.COMPANY_ADMIN:
+      case 'COMPANY_ADMIN':
         return 'bg-accent-100 text-accent-800';
-      case UserRole.AGENT:
+      case 'AGENT':
         return 'bg-secondary-100 text-secondary-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -123,6 +133,21 @@ const AdminUserManagement = () => {
     }
   };
 
+  // FIX 4: Fonction pour normaliser l'affichage du rôle
+  const getRoleDisplayName = (role: string) => {
+    const normalizedRole = role?.toUpperCase();
+    switch (normalizedRole) {
+      case 'SUPER_ADMIN':
+        return 'Super Admin';
+      case 'COMPANY_ADMIN':
+        return 'Admin';
+      case 'AGENT':
+        return 'Agent';
+      default:
+        return role || 'Non défini';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -135,7 +160,7 @@ const AdminUserManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Gestion des utilisateurs</h1>
-        <Button leftIcon={<Plus className="h-5 w-5" />}>
+        <Button leftIcon={<Plus className="h-5 w-5" />} onClick={fetchUsers}>
           Ajouter un utilisateur
         </Button>
       </div>
@@ -165,34 +190,54 @@ const AdminUserManagement = () => {
                 }`}
                 onClick={() => setSelectedTab('all')}
               >
-                Tous
+                Tous ({users.length})
               </button>
-              {Object.values(UserRole).map((role) => (
-                <button
-                  key={role}
-                  className={`px-4 py-2 text-sm font-medium rounded-md ${
-                    selectedTab === role.toLowerCase()
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                  onClick={() => setSelectedTab(role.toLowerCase())}
-                >
-                  {role === UserRole.SUPER_ADMIN ? 'Super Admin' :
-                   role === UserRole.COMPANY_ADMIN ? 'Admin' : 'Agent'}
-                </button>
-              ))}
+              {Object.values(UserRole).map((role) => {
+                // FIX 5: Compter les utilisateurs par rôle correctement
+                const roleCount = users.filter(user => 
+                  user.role?.toUpperCase() === role.toUpperCase()
+                ).length;
+                
+                return (
+                  <button
+                    key={role}
+                    className={`px-4 py-2 text-sm font-medium rounded-md ${
+                      selectedTab === role.toLowerCase()
+                        ? 'bg-primary-100 text-primary-700'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setSelectedTab(role.toLowerCase())}
+                  >
+                    {getRoleDisplayName(role)} ({roleCount})
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <input
-                type="text"
-                placeholder="Rechercher un utilisateur..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-              />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+            <div className="flex items-center space-x-2">
+              <Button 
+                onClick={fetchUsers}
+                variant="outlined"
+                size="sm"
+              >
+                Actualiser
+              </Button>
+              <div className="relative w-full sm:w-64">
+                <input
+                  type="text"
+                  placeholder="Rechercher un utilisateur..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+                <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+              </div>
             </div>
+          </div>
+
+          {/* Debug Info */}
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+            <p>Debug: {users.length} utilisateurs dans la base, {filteredUsers.length} affichés</p>
           </div>
 
           {/* Users Table */}
@@ -218,92 +263,97 @@ const AdminUserManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <motion.tr
-                    key={user.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                          {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || '?'}
+                {filteredUsers.map((user) => {
+                  // FIX 6: Gérer les différents formats de noms
+                  const displayName = user.name || user.fullName || user.displayName || 'Sans nom';
+                  const displayEmail = user.email || 'Email non défini';
+                  
+                  return (
+                    <motion.tr
+                      key={user.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            {displayName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{displayName}</div>
+                            <div className="text-sm text-gray-500">{displayEmail}</div>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.name || 'Sans nom'}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                        {user.role === UserRole.SUPER_ADMIN ? 'Super Admin' :
-                         user.role === UserRole.COMPANY_ADMIN ? 'Admin' : 'Agent'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {user.company?.name || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="flex items-center">
-                        {getStatusIcon(user.status || 'pending')}
-                        <span className={`text-sm ${getStatusColor(user.status || 'pending')}`}>
-                          {user.status === 'active' ? 'Actif' : 
-                           user.status === 'inactive' ? 'Inactif' : 'En attente'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                          {getRoleDisplayName(user.role)}
                         </span>
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button 
-                          className="text-primary-600 hover:text-primary-900"
-                          onClick={() => console.log('Edit user:', user.id)}
-                          title="Modifier"
-                        >
-                          <Edit2 className="h-5 w-5" />
-                        </button>
-                        <button 
-                          className="text-blue-600 hover:text-blue-900"
-                          onClick={() => handlePasswordReset(user.email)}
-                          title="Réinitialiser le mot de passe"
-                        >
-                          🔑
-                        </button>
-                        {user.status !== 'active' && (
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {user.company?.name || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="flex items-center">
+                          {getStatusIcon(user.status || 'pending')}
+                          <span className={`text-sm ${getStatusColor(user.status || 'pending')}`}>
+                            {user.status === 'active' ? 'Actif' : 
+                             user.status === 'inactive' ? 'Inactif' : 'En attente'}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
                           <button 
-                            className="text-green-600 hover:text-green-900"
-                            onClick={() => handleStatusUpdate(user.id, 'active')}
-                            title="Activer"
+                            className="text-primary-600 hover:text-primary-900"
+                            onClick={() => console.log('Edit user:', user.id)}
+                            title="Modifier"
                           >
-                            <CheckCircle className="h-5 w-5" />
+                            <Edit2 className="h-5 w-5" />
                           </button>
-                        )}
-                        {user.status === 'active' && (
                           <button 
-                            className="text-yellow-600 hover:text-yellow-900"
-                            onClick={() => handleStatusUpdate(user.id, 'inactive')}
-                            title="Désactiver"
+                            className="text-blue-600 hover:text-blue-900"
+                            onClick={() => handlePasswordReset(displayEmail)}
+                            title="Réinitialiser le mot de passe"
                           >
-                            <XCircle className="h-5 w-5" />
+                            🔑
                           </button>
-                        )}
-                        <button 
-                          className="text-red-600 hover:text-red-900"
-                          onClick={() => handleDeleteUser(user.id)}
-                          title="Supprimer"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <MoreVertical className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
+                          {user.status !== 'active' && (
+                            <button 
+                              className="text-green-600 hover:text-green-900"
+                              onClick={() => handleStatusUpdate(user.id, 'active')}
+                              title="Activer"
+                            >
+                              <CheckCircle className="h-5 w-5" />
+                            </button>
+                          )}
+                          {user.status === 'active' && (
+                            <button 
+                              className="text-yellow-600 hover:text-yellow-900"
+                              onClick={() => handleStatusUpdate(user.id, 'inactive')}
+                              title="Désactiver"
+                            >
+                              <XCircle className="h-5 w-5" />
+                            </button>
+                          )}
+                          <button 
+                            className="text-red-600 hover:text-red-900"
+                            onClick={() => handleDeleteUser(user.id)}
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                          <button className="text-gray-400 hover:text-gray-600">
+                            <MoreVertical className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

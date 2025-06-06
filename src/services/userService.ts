@@ -81,6 +81,8 @@ export const userService = {
         id: userCredential.user.uid,
         email: userData.email,
         name: userData.name,
+        fullName: userData.name, // FIX: Ajouter fullName pour compatibilité
+        displayName: userData.name, // FIX: Ajouter displayName pour compatibilité
         role: userData.role,
         companyId: userData.companyId,
         createdBy: auth.currentUser?.uid || null,
@@ -122,38 +124,77 @@ export const userService = {
     }
   },
 
-  // Get all users (super admin only)
+  // FIX: Améliorer getAllUsers pour gérer tous les cas
   async getAllUsers() {
     try {
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('createdAt', 'desc'));
-
-      const querySnapshot = await getDocs(q);
+      // FIX: Supprimer l'orderBy qui peut causer des problèmes si certains documents n'ont pas createdAt
+      const querySnapshot = await getDocs(usersRef);
       const users: any[] = [];
+
+      console.log('Documents récupérés:', querySnapshot.size); // Debug
 
       // Get users with company and creator information
       for (const docSnapshot of querySnapshot.docs) {
         const userData = { id: docSnapshot.id, ...docSnapshot.data() };
         
+        console.log('Document utilisateur:', userData); // Debug
+        
+        // FIX: Normaliser les champs de nom
+        if (!userData.name && userData.fullName) {
+          userData.name = userData.fullName;
+        }
+        if (!userData.name && userData.displayName) {
+          userData.name = userData.displayName;
+        }
+        
+        // FIX: S'assurer que le rôle est correctement formaté
+        if (userData.role) {
+          userData.role = userData.role.toUpperCase();
+        }
+        
+        // FIX: S'assurer qu'il y a un statut par défaut
+        if (!userData.status) {
+          userData.status = 'pending';
+        }
+
         // Get company information if companyId exists
         if (userData.companyId) {
-          const companyDoc = await getDoc(doc(db, 'companies', userData.companyId));
-          if (companyDoc.exists()) {
-            userData.company = { id: companyDoc.id, ...companyDoc.data() };
+          try {
+            const companyDoc = await getDoc(doc(db, 'companies', userData.companyId));
+            if (companyDoc.exists()) {
+              userData.company = { id: companyDoc.id, ...companyDoc.data() };
+            }
+          } catch (companyError) {
+            console.warn('Erreur lors de la récupération de l\'entreprise:', companyError);
+            // Continue sans l'info de l'entreprise
           }
         }
 
         // Get creator information if createdBy exists
         if (userData.createdBy) {
-          const creatorDoc = await getDoc(doc(db, 'users', userData.createdBy));
-          if (creatorDoc.exists()) {
-            userData.createdByUser = { id: creatorDoc.id, ...creatorDoc.data() };
+          try {
+            const creatorDoc = await getDoc(doc(db, 'users', userData.createdBy));
+            if (creatorDoc.exists()) {
+              userData.createdByUser = { id: creatorDoc.id, ...creatorDoc.data() };
+            }
+          } catch (creatorError) {
+            console.warn('Erreur lors de la récupération du créateur:', creatorError);
+            // Continue sans l'info du créateur
           }
         }
 
         users.push(userData);
       }
 
+      // FIX: Trier par date de création côté client pour éviter les erreurs d'index
+      users.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || a.createdAt || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || b.createdAt || new Date(0);
+        return new Date(dateB) - new Date(dateA);
+      });
+
+      console.log('Utilisateurs traités:', users.length); // Debug
       return users;
     } catch (error) {
       console.error('Error getting all users:', error);
@@ -221,10 +262,19 @@ export const userService = {
     try {
       const userRef = doc(db, 'users', userId);
       
-      await updateDoc(userRef, {
+      // FIX: S'assurer que les champs de nom sont cohérents
+      const updateData = {
         ...updates,
         updatedAt: new Date()
-      });
+      };
+      
+      // Si on met à jour le nom, mettre à jour tous les champs de nom
+      if (updates.name) {
+        updateData.fullName = updates.name;
+        updateData.displayName = updates.name;
+      }
+      
+      await updateDoc(userRef, updateData);
 
       // Get updated user data
       const updatedDoc = await getDoc(userRef);
