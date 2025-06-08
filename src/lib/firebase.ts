@@ -22,5 +22,4 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
-const functions = getFunctions(app);
-
+export const functions = getFunctions(app); // ✅ Ajout manquant

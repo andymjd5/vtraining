@@ -35,6 +35,8 @@ const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'));
 const CompanyManagement = lazy(() => import('./pages/super-admin/CompanyManagement'));
 const CourseManagement = lazy(() => import('./pages/super-admin/CourseManagement'));
 const AdminUserManagement = lazy(() => import('./pages/super-admin/UserManagement'));
+const CourseAssignment = lazy(() => import('./pages/super-admin/CourseAssignment'));
+
 
 function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -140,6 +142,7 @@ function App() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="companies" element={<CompanyManagement />} />
             <Route path="courses" element={<CourseManagement />} />
+			<Route path="courses/assign" element={<CourseAssignment />} />
             <Route path="users" element={<AdminUserManagement />} />
           </Route>
 

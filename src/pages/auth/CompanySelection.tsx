@@ -1,4 +1,4 @@
-import React, { useState, useContext, Fragment } from 'react';
+import React, { useState, useContext, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Check, ChevronDown, Search } from 'lucide-react';
@@ -6,34 +6,60 @@ import { Combobox, Transition } from '@headlessui/react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { CompanyContext } from '../../contexts/CompanyContext';
+import { db } from '../../lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface Company {
   id: string;
   name: string;
-  logo: string;
+  logoUrl?: string;
+  email?: string;
+  phone?: string;
 }
-
-const companies: Company[] = [
-  { id: 'fonarev', name: 'FONAREV', logo: '🏢' },
-  { id: 'unikin', name: 'UNIKIN', logo: '🎓' },
-  { id: 'vision26', name: 'VISION 26', logo: '👁️' },
-  { id: 'pnjt', name: 'PNJT', logo: '⚖️' },
-  { id: 'besdu', name: 'BESDU', logo: '📚' },
-];
 
 const CompanySelection = () => {
   const { selectCompany } = useContext(CompanyContext);
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Company | null>(null);
-  const [query, setQuery] = useState('');
+  const [queryText, setQueryText] = useState('');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredCompanies = query === ''
+  useEffect(() => {
+    const fetchActiveCompanies = async () => {
+      try {
+        setLoading(true);
+        const q = query(collection(db, 'companies'), where('isActive', '==', true));
+        const querySnapshot = await getDocs(q);
+        
+        const companiesData: Company[] = [];
+        querySnapshot.forEach((doc) => {
+          companiesData.push({
+            id: doc.id,
+            ...doc.data()
+          } as Company);
+        });
+        
+        setCompanies(companiesData);
+      } catch (err: any) {
+        setError('Erreur lors du chargement des entreprises');
+        console.error('Error fetching companies:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActiveCompanies();
+  }, []);
+
+  const filteredCompanies = queryText === ''
     ? companies
     : companies.filter((company) =>
         company.name
           .toLowerCase()
           .replace(/\s+/g, '')
-          .includes(query.toLowerCase().replace(/\s+/g, ''))
+          .includes(queryText.toLowerCase().replace(/\s+/g, ''))
       );
 
   const handleContinue = () => {
@@ -42,6 +68,30 @@ const CompanySelection = () => {
       navigate(`/login/${selected.id}`);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des entreprises...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
@@ -71,7 +121,7 @@ const CompanySelection = () => {
                       <Combobox.Input
                         className="w-full border-none py-3 pl-4 pr-10 text-base leading-5 text-gray-900 focus:ring-0 placeholder-gray-400"
                         displayValue={(company: Company) => company?.name || ''}
-                        onChange={(event) => setQuery(event.target.value)}
+                        onChange={(event) => setQueryText(event.target.value)}
                         placeholder="Rechercher une entreprise..."
                       />
                       <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -86,10 +136,10 @@ const CompanySelection = () => {
                       leave="transition ease-in duration-100"
                       leaveFrom="opacity-100"
                       leaveTo="opacity-0"
-                      afterLeave={() => setQuery('')}
+                      afterLeave={() => setQueryText('')}
                     >
-                      <Combobox.Options className="absolute z-50 mt-1 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        {filteredCompanies.length === 0 && query !== '' ? (
+                      <Combobox.Options className="absolute z-50 mt-1 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none max-h-60">
+                        {filteredCompanies.length === 0 && queryText !== '' ? (
                           <div className="relative cursor-default select-none py-4 px-4 text-center text-gray-700">
                             Aucune entreprise trouvée.
                           </div>
@@ -98,7 +148,7 @@ const CompanySelection = () => {
                             <Combobox.Option
                               key={company.id}
                               className={({ active }) =>
-                                `relative cursor-pointer select-none py-2.5 pl-10 pr-4 ${
+                                `relative cursor-pointer select-none py-3 pl-12 pr-4 ${
                                   active ? 'bg-primary-600 text-white' : 'text-gray-900'
                                 }`
                               }
@@ -107,7 +157,15 @@ const CompanySelection = () => {
                               {({ selected, active }) => (
                                 <>
                                   <span className={`flex items-center truncate text-sm ${selected ? 'font-medium' : 'font-normal'}`}>
-                                    <span className="mr-2 text-lg">{company.logo}</span>
+                                    <img
+                                      src={company.logoUrl || '/default-logo.png'}
+                                      alt={`${company.name} logo`}
+                                      className="w-6 h-6 object-contain mr-3 flex-shrink-0"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = '/default-logo.png';
+                                      }}
+                                    />
                                     {company.name}
                                   </span>
                                   {selected ? (
@@ -129,6 +187,12 @@ const CompanySelection = () => {
                   </div>
                 </Combobox>
               </div>
+
+              {companies.length === 0 && !loading && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Aucune entreprise active disponible.</p>
+                </div>
+              )}
 
               <Button
                 onClick={handleContinue}
