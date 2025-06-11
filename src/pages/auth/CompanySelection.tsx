@@ -30,7 +30,7 @@ const CompanySelection = () => {
     const fetchActiveCompanies = async () => {
       try {
         setLoading(true);
-        const q = query(collection(db, 'companies'), where('isActive', '==', true));
+        const q = query(collection(db, 'companies'), where('status', '==', 'active'));
         const querySnapshot = await getDocs(q);
         
         const companiesData: Company[] = [];

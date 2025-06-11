@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../lib/firebase';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Progress } from '../../components/ui/progress';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
-import { Badge } from '../../components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Progress } from '../../components/ui/Progress';
+import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/Avatar';
+import { Badge } from '../../components/ui/Badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
+
 import { 
-  Play, 
   CheckCircle, 
   Clock, 
-  User, 
   BookOpen, 
   ArrowLeft,
   PlayCircle,
@@ -21,7 +20,11 @@ import {
   Star,
   Award
 } from 'lucide-react';
-import { toast } from 'sonner';
+
+const toast = {
+  success: (message: string) => console.log('✅', message),
+  error: (message: string) => console.error('❌', message)
+};
 
 interface Chapter {
   id: string;
@@ -80,8 +83,10 @@ export default function CourseView() {
   }, [courseId, user]);
 
   const loadCourseData = async () => {
+    if (!courseId) return;
+    
     try {
-      const courseDoc = await getDoc(doc(db, 'courses', courseId!));
+      const courseDoc = await getDoc(doc(db, 'courses', courseId));
       if (courseDoc.exists()) {
         const courseData = { id: courseDoc.id, ...courseDoc.data() } as Course;
         setCourse(courseData);
@@ -100,14 +105,16 @@ export default function CourseView() {
   };
 
   const loadUserProgress = async () => {
+    if (!user?.uid || !courseId) return;
+    
     try {
-      const progressDoc = await getDoc(doc(db, 'userProgress', `${user?.uid}_${courseId}`));
+      const progressDoc = await getDoc(doc(db, 'userProgress', `${user.uid}_${courseId}`));
       if (progressDoc.exists()) {
         setUserProgress(progressDoc.data() as UserProgress);
       } else {
         // Initialize progress
         const initialProgress: UserProgress = {
-          courseId: courseId!,
+          courseId: courseId,
           completedChapters: [],
           currentChapter: course?.chapters?.[0]?.id || '',
           progressPercentage: 0,
@@ -121,7 +128,7 @@ export default function CourseView() {
   };
 
   const markChapterComplete = async (chapterId: string) => {
-    if (!user || !course || !userProgress) return;
+    if (!user?.uid || !course || !userProgress || !courseId) return;
 
     try {
       const updatedCompletedChapters = [...userProgress.completedChapters];

@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User as FirebaseUser,
@@ -43,6 +43,14 @@ export const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -68,7 +76,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const fetchUserData = async (firebaseUser: FirebaseUser) => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      console.log('DEBUG: fetchUserData called');
+      console.log('DEBUG: Firebase UID utilisé:', firebaseUser.uid);
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      console.log('DEBUG: userDoc.id =', userDoc.id, '| exists =', userDoc.exists());
+
       if (!userDoc.exists()) {
         throw new Error('User profile not found');
       }
@@ -123,7 +136,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     try {
       const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+
+      // DEBUG: Ajout log UID
+      console.log("DEBUG: Login - Firebase UID utilisé:", firebaseUser.uid);
+
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      // DEBUG: Ajout log userDoc
+      console.log("DEBUG: userDoc.id =", userDoc.id, "| exists =", userDoc.exists());
 
       if (!userDoc.exists()) {
         throw new Error('User profile not found');

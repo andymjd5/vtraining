@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
-import { db } from "../../../lib/firebase";
+import { db } from "../../lib/firebase";
 import { Plus, Edit2, Trash2, Users, Clock, BookOpen } from 'lucide-react';
-import CourseForm from '../../components/courses/CourseForm';
+import CourseForm from './CourseForm';
+
 
 interface Course {
   id: string;

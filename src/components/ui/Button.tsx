@@ -1,7 +1,7 @@
 import React, { ButtonHTMLAttributes } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outlined' | 'text' | 'success' | 'error';
+  variant?: 'primary' | 'secondary' | 'outlined' | 'text' | 'success' | 'error' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
@@ -19,15 +19,16 @@ const Button: React.FC<ButtonProps> = ({
   disabled,
   ...rest
 }) => {
-  const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variantClasses = {
-    primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
-    secondary: 'bg-secondary-600 text-white hover:bg-secondary-700 focus:ring-secondary-500',
-    outlined: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-primary-500',
-    text: 'bg-transparent text-primary-600 hover:bg-gray-100 focus:ring-primary-500',
-    success: 'bg-success-600 text-white hover:bg-success-700 focus:ring-success-500',
-    error: 'bg-error-600 text-white hover:bg-error-700 focus:ring-error-500',
+    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
+    secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
+    outlined: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-indigo-500',
+    text: 'bg-transparent text-indigo-600 hover:bg-gray-100 focus:ring-indigo-500',
+    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
+    error: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+    ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-500',
   };
   
   const sizeClasses = {
@@ -36,11 +37,9 @@ const Button: React.FC<ButtonProps> = ({
     lg: 'px-5 py-2.5 text-base',
   };
   
-  const disabledClasses = disabled || isLoading ? 'opacity-60 cursor-not-allowed' : '';
-  
   return (
     <button
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${disabledClasses} ${className}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       disabled={disabled || isLoading}
       {...rest}
     >
@@ -58,4 +57,5 @@ const Button: React.FC<ButtonProps> = ({
   );
 };
 
+export { Button };
 export default Button;

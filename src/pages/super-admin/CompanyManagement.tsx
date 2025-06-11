@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Building, CheckCircle, XCircle, Plus, Search, Download, Edit2, Trash2, MoreVertical } from 'lucide-react';
 import { collection, getDocs, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../../lib/firebase';
+import { db } from '../../lib/firebase';
 import { format } from 'date-fns';
 import { useToast } from '../../hooks/useToast';
 import AddCompanyModal from '../../components/modals/AddCompanyModal';
