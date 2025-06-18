@@ -12,6 +12,7 @@ import { UserRole } from '../types';
 
 interface User {
   id: string;
+  uid: string; // Ajout explicite de uid pour compatibilité
   email: string;
   role: UserRole;
   companyId?: string;
@@ -22,18 +23,21 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  initializing: boolean; // Nouvel état pour le chargement initial
   error: string | null;
 }
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, expectedRole?: UserRole) => Promise<void>;
   logout: () => Promise<void>;
+  loading: boolean; // Alias pour initializing (pour compatibilité)
 }
 
 const defaultAuthState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: false,
+  initializing: true, // Par défaut à true car on initialise
   error: null,
 };
 
@@ -41,6 +45,7 @@ export const AuthContext = createContext<AuthContextType>({
   ...defaultAuthState,
   login: async () => {},
   logout: async () => {},
+  loading: true,
 });
 
 export const useAuth = () => {
@@ -60,24 +65,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('AuthProvider: Setting up onAuthStateChanged listener');
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('AuthProvider: onAuthStateChanged triggered', { firebaseUser: firebaseUser?.uid });
+      
       if (firebaseUser) {
+        console.log('AuthProvider: User found, fetching profile data');
         await fetchUserData(firebaseUser);
       } else {
+        console.log('AuthProvider: No user found, setting state to unauthenticated');
         setAuthState({
-          ...defaultAuthState,
+          user: null,
+          isAuthenticated: false,
           isLoading: false,
+          initializing: false, // Fini d'initialiser
+          error: null,
         });
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('AuthProvider: Cleaning up onAuthStateChanged listener');
+      unsubscribe();
+    };
   }, []);
 
   const fetchUserData = async (firebaseUser: FirebaseUser) => {
     try {
-      console.log('DEBUG: fetchUserData called');
-      console.log('DEBUG: Firebase UID utilisé:', firebaseUser.uid);
+      console.log('DEBUG: fetchUserData called for UID:', firebaseUser.uid);
+      
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       const userDoc = await getDoc(userDocRef);
       console.log('DEBUG: userDoc.id =', userDoc.id, '| exists =', userDoc.exists());
@@ -92,9 +109,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         role: String(rawData.role),
       } as User;
 
+      console.log('AuthProvider: User data fetched successfully', userData);
+
       setAuthState({
         user: {
           id: firebaseUser.uid,
+          uid: firebaseUser.uid, // Ajout explicite
           email: firebaseUser.email!,
           role: userData.role,
           companyId: userData.companyId,
@@ -102,13 +122,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         },
         isAuthenticated: true,
         isLoading: false,
+        initializing: false, // Fini d'initialiser
         error: null,
       });
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('AuthProvider: Error fetching user data:', error);
       setAuthState({
-        ...defaultAuthState,
+        user: null,
+        isAuthenticated: false,
         isLoading: false,
+        initializing: false, // Fini d'initialiser même en cas d'erreur
         error: 'Error fetching user data',
       });
     }
@@ -132,6 +155,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const login = async (email: string, password: string, expectedRole?: UserRole) => {
+    console.log('AuthProvider: Login attempt started');
     setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -169,6 +193,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setAuthState({
         user: {
           id: firebaseUser.uid,
+          uid: firebaseUser.uid, // Ajout explicite
           email: firebaseUser.email!,
           role: userData.role,
           companyId: userData.companyId,
@@ -176,12 +201,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         },
         isAuthenticated: true,
         isLoading: false,
+        initializing: false,
         error: null,
       });
 
+      console.log('AuthProvider: Login successful, redirecting based on role');
       redirectBasedOnRole(userData.role);
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('AuthProvider: Login error:', error);
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
@@ -193,14 +220,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = async () => {
     try {
+      console.log('AuthProvider: Logout started');
       await firebaseSignOut(auth);
       setAuthState({
-        ...defaultAuthState,
+        user: null,
+        isAuthenticated: false,
         isLoading: false,
+        initializing: false,
+        error: null,
       });
+      console.log('AuthProvider: Logout successful');
       navigate('/');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('AuthProvider: Logout error:', error);
       setAuthState(prev => ({
         ...prev,
         error: 'Error during logout',
@@ -208,14 +240,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  // Création de la valeur du contexte avec l'alias loading
+  const contextValue: AuthContextType = {
+    ...authState,
+    loading: authState.initializing, // Alias pour compatibilité
+    login,
+    logout,
+  };
+
+  console.log('AuthProvider: Current state', {
+    user: authState.user?.uid,
+    isAuthenticated: authState.isAuthenticated,
+    initializing: authState.initializing,
+    loading: authState.initializing
+  });
+
   return (
-    <AuthContext.Provider
-      value={{
-        ...authState,
-        login,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -27,6 +27,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useAnalyticsStore } from '../../stores/analyticsStore';
 import { analyticsService } from '../../services/analyticsService';
 import { format } from 'date-fns';
+import AssignedCoursesSection from './AssignedCoursesSection';
 
 const CompanyAdminDashboard = () => {
   const { user } = useAuth();
@@ -268,6 +269,17 @@ const CompanyAdminDashboard = () => {
           </div>
         </Card>
       </motion.div>
+
+      {/* Assigned Courses Section */}
+      {user?.company_id && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+        >
+          <AssignedCoursesSection companyId={user.company_id} />
+        </motion.div>
+      )}
     </div>
   );
 };

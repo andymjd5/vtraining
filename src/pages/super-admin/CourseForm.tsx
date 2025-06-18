@@ -1,7 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from "../../lib/firebase";
 import { 
   X, Upload, Save, FileVideo, User, BookOpen, Settings, 
   Plus, ChevronRight, ChevronDown, Move, Image as ImageIcon,
@@ -51,6 +48,7 @@ interface Course {
   title: string;
   description: string;
   category: string;
+  subcategory?: string; // Nouveau champ optionnel
   level: string;
   duration: number;
   videoUrl?: string;
@@ -76,7 +74,8 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     title: course?.title || '',
     description: course?.description || '',
-    category: course?.category || 'informatique',
+    category: course?.category || 'Justice transitionnelle', // Valeur par défaut mise à jour
+    subcategory: course?.subcategory || '', // Nouveau champ
     level: course?.level || 'débutant',
     duration: course?.duration || 0,
     instructorName: course?.instructor?.name || '',
@@ -108,18 +107,77 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   const imageUploadRef = useRef<HTMLInputElement>(null);
   const videoUploadRef = useRef<HTMLInputElement>(null);
 
+  // Liste des catégories mise à jour selon les spécifications
   const categories = [
+    'Justice transitionnelle',
+    'Droits humains',
+    'Droit international humanitaire',
+    'Finances & Comptabilité',
+    'Droit',
+    'Management',
+    'Gouvernance',
+    'Économie',
     'Informatique',
-    'Droits Humains',
-    'Justice Transitionnelle',
-    'Accompagnement Psychologique',
-    'Anglais'
+    'Cours linguistiques',
+    'Statistiques',
+    'Politique',
+    'Médecine'
   ];
 
   const levels = ['Débutant', 'Intermédiaire', 'Avancé'];
 
   // Génération d'ID unique
   const generateId = () => Math.random().toString(36).substr(2, 9);
+  
+  const applyFormatting = (
+    chapterId: string,
+    sectionId: string,
+    blockId: string,
+    formatType: string
+  ) => {
+    setChapters((prevChapters) =>
+      prevChapters.map((ch) =>
+        ch.id === chapterId
+          ? {
+              ...ch,
+              sections: ch.sections.map((sec) =>
+                sec.id === sectionId
+                  ? {
+                      ...sec,
+                      content: sec.content.map((block) => {
+                        if (block.id !== blockId) return block;
+
+                        // Toggle le formatage
+                        let newFormatting = { ...(block.formatting || {}) };
+                        if (formatType === 'bold') {
+                          newFormatting.bold = !newFormatting.bold;
+                        }
+                        if (formatType === 'italic') {
+                          newFormatting.italic = !newFormatting.italic;
+                        }
+                        if (formatType === 'list') {
+                          newFormatting.list = !newFormatting.list;
+                        }
+                        if (
+                          formatType === 'left' ||
+                          formatType === 'center' ||
+                          formatType === 'right'
+                        ) {
+                          newFormatting.alignment = formatType as
+                            | 'left'
+                            | 'center'
+                            | 'right';
+                        }
+                        return { ...block, formatting: newFormatting };
+                      }),
+                    }
+                  : sec
+              ),
+            }
+          : ch
+      )
+    );
+  };
 
   // Gestion des changements dans le formulaire de base
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -138,12 +196,14 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
     if (file) setPhotoFile(file);
   };
 
-  // Upload de média pour le contenu
+  // Simulation d'upload de média pour le contenu (remplacez par votre logique Firebase)
   const uploadMedia = async (file: File, type: 'image' | 'video'): Promise<string> => {
-    const folder = type === 'image' ? 'course_images' : 'course_videos';
-    const mediaRef = ref(storage, `${folder}/${Date.now()}_${file.name}`);
-    await uploadBytes(mediaRef, file);
-    return await getDownloadURL(mediaRef);
+    // Simulation d'upload - remplacez par votre logique Firebase
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(URL.createObjectURL(file));
+      }, 1000);
+    });
   };
 
   // Gestion des chapitres
@@ -391,50 +451,16 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
     setUploading(true);
 
     try {
-      let videoUrl = course?.videoUrl || '';
-      let photoUrl = course?.instructor?.photoUrl || '';
-
-      // Upload video si sélectionné
-      if (videoFile) {
-        const videoRef = ref(storage, `course_videos/${Date.now()}_${videoFile.name}`);
-        await uploadBytes(videoRef, videoFile);
-        videoUrl = await getDownloadURL(videoRef);
-      }
-
-      // Upload photo instructeur si sélectionnée
-      if (photoFile) {
-        const photoRef = ref(storage, `instructor_photos/${Date.now()}_${photoFile.name}`);
-        await uploadBytes(photoRef, photoFile);
-        photoUrl = await getDownloadURL(photoRef);
-      }
-
-      const courseData = {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        level: formData.level,
-        duration: Number(formData.duration),
-        videoUrl,
-        instructor: {
-          name: formData.instructorName,
-          title: formData.instructorTitle,
-          bio: formData.instructorBio,
-          photoUrl
-        },
-        chapters: chapters,
-        assignedTo: course?.assignedTo || [],
-        updatedAt: serverTimestamp()
-      };
-
-      if (course) {
-        await updateDoc(doc(db, 'courses', course.id), courseData);
-      } else {
-        await addDoc(collection(db, 'courses'), {
-          ...courseData,
-          createdAt: serverTimestamp()
-        });
-      }
-
+      // Simulation de sauvegarde - remplacez par votre logique Firebase
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      console.log('Données du cours:', {
+        ...formData,
+        chapters,
+        videoFile,
+        photoFile
+      });
+      
       onSave();
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
@@ -469,7 +495,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
               value={formData.title}
               onChange={handleInputChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-              placeholder="Ex: Introduction au JavaScript"
+              placeholder="Ex: Introduction à la justice transitionnelle"
               required
             />
           </div>
@@ -488,25 +514,40 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Catégorie
-              </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-              >
-                {categories.map(category => (
-                  <option key={category} value={category.toLowerCase()}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Catégorie *
+            </label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+              required
+            >
+              {categories.map(category => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Sous-catégorie/Thème
+            </label>
+            <input
+              type="text"
+              name="subcategory"
+              value={formData.subcategory}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+              placeholder="Ex: Mécanismes de réconciliation (optionnel)"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Niveau
@@ -524,21 +565,21 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                 ))}
               </select>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Durée estimée (heures)
-            </label>
-            <input
-              type="number"
-              name="duration"
-              value={formData.duration}
-              onChange={handleInputChange}
-              min="0"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-              placeholder="Ex: 5"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Durée estimée (heures)
+              </label>
+              <input
+                type="number"
+                name="duration"
+                value={formData.duration}
+                onChange={handleInputChange}
+                min="0"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+                placeholder="Ex: 5"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -612,7 +653,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                 value={formData.instructorTitle}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-                placeholder="Ex: Expert en Développement Web"
+                placeholder="Ex: Expert en Justice Transitionnelle"
               />
             </div>
 
@@ -662,7 +703,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
     </div>
   );
 
-  // Rendu de l'éditeur de contenu
+  // Rendu de l'éditeur de contenu 
   const renderContentEditor = () => {
     const activeChapterData = chapters.find(ch => ch.id === activeChapter);
     const activeSectionData = activeChapterData?.sections.find(sec => sec.id === activeSection);
@@ -709,7 +750,12 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                       updateChapterTitle(chapter.id, e.target.value);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      (e.target as HTMLInputElement).select();
+                    }}
+                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium hover:bg-gray-100 px-2 py-1 rounded"
+                    placeholder="Nom du chapitre"
                   />
                   <button
                     type="button"
@@ -776,17 +822,18 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
         <div className="lg:col-span-3 bg-white rounded-xl border border-gray-200 overflow-hidden">
           {activeSectionData ? (
             <div className="h-full flex flex-col">
-              {/* Barre d'outils */}
+              {/* Header de la section */}
               <div className="border-b border-gray-200 p-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-2">
                   <h4 className="text-lg font-semibold text-gray-900">
                     {activeSectionData.title}
                   </h4>
                   <div className="flex items-center gap-2">
+                    {/* Boutons d'ajout de contenu */}
                     <button
                       type="button"
                       onClick={() => addContentBlock(activeChapter!, activeSection!, 'text')}
-                      className="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
                     >
                       <Type className="h-4 w-4" />
                       Texte
@@ -794,7 +841,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                     <button
                       type="button"
                       onClick={() => imageUploadRef.current?.click()}
-                      className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      className="flex items-center gap-2 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm"
                     >
                       <ImageIcon className="h-4 w-4" />
                       Image
@@ -802,8 +849,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                     <button
                       type="button"
                       onClick={() => videoUploadRef.current?.click()}
-
-className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      className="flex items-center gap-2 px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm"
                     >
                       <FileVideo className="h-4 w-4" />
                       Vidéo
@@ -816,39 +862,27 @@ className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-2 rounded-lg t
                   <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
                     <button
                       type="button"
-                      onClick={() => {
-                        const newFormatting = { bold: !textFormatting.bold };
-                        setTextFormatting(prev => ({ ...prev, ...newFormatting }));
-                        updateBlockFormatting(activeChapter!, activeSection!, selectedBlockId, newFormatting);
-                      }}
-                      className={`p-2 rounded transition-colors ${
-                        textFormatting.bold ? 'bg-red-500 text-white' : 'bg-white hover:bg-gray-100'
+                      onClick={() => applyFormatting(activeChapter!, activeSection!, selectedBlockId, 'bold')}
+                      className={`p-2 rounded hover:bg-gray-200 transition-colors ${
+                        textFormatting.bold ? 'bg-gray-300' : ''
                       }`}
                     >
                       <Bold className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        const newFormatting = { italic: !textFormatting.italic };
-                        setTextFormatting(prev => ({ ...prev, ...newFormatting }));
-                        updateBlockFormatting(activeChapter!, activeSection!, selectedBlockId, newFormatting);
-                      }}
-                      className={`p-2 rounded transition-colors ${
-                        textFormatting.italic ? 'bg-red-500 text-white' : 'bg-white hover:bg-gray-100'
+                      onClick={() => applyFormatting(activeChapter!, activeSection!, selectedBlockId, 'italic')}
+                      className={`p-2 rounded hover:bg-gray-200 transition-colors ${
+                        textFormatting.italic ? 'bg-gray-300' : ''
                       }`}
                     >
                       <Italic className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        const newFormatting = { list: !textFormatting.list };
-                        setTextFormatting(prev => ({ ...prev, ...newFormatting }));
-                        updateBlockFormatting(activeChapter!, activeSection!, selectedBlockId, newFormatting);
-                      }}
-                      className={`p-2 rounded transition-colors ${
-                        textFormatting.list ? 'bg-red-500 text-white' : 'bg-white hover:bg-gray-100'
+                      onClick={() => applyFormatting(activeChapter!, activeSection!, selectedBlockId, 'list')}
+                      className={`p-2 rounded hover:bg-gray-200 transition-colors ${
+                        textFormatting.list ? 'bg-gray-300' : ''
                       }`}
                     >
                       <List className="h-4 w-4" />
@@ -856,39 +890,27 @@ className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-2 rounded-lg t
                     <div className="w-px h-6 bg-gray-300 mx-2"></div>
                     <button
                       type="button"
-                      onClick={() => {
-                        const newFormatting = { alignment: 'left' as 'left' };
-                        setTextFormatting(prev => ({ ...prev, ...newFormatting }));
-                        updateBlockFormatting(activeChapter!, activeSection!, selectedBlockId, newFormatting);
-                      }}
-                      className={`p-2 rounded transition-colors ${
-                        textFormatting.alignment === 'left' ? 'bg-red-500 text-white' : 'bg-white hover:bg-gray-100'
+                      onClick={() => applyFormatting(activeChapter!, activeSection!, selectedBlockId, 'left')}
+                      className={`p-2 rounded hover:bg-gray-200 transition-colors ${
+                        textFormatting.alignment === 'left' ? 'bg-gray-300' : ''
                       }`}
                     >
                       <AlignLeft className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        const newFormatting = { alignment: 'center' as 'center' };
-                        setTextFormatting(prev => ({ ...prev, ...newFormatting }));
-                        updateBlockFormatting(activeChapter!, activeSection!, selectedBlockId, newFormatting);
-                      }}
-                      className={`p-2 rounded transition-colors ${
-                        textFormatting.alignment === 'center' ? 'bg-red-500 text-white' : 'bg-white hover:bg-gray-100'
+                      onClick={() => applyFormatting(activeChapter!, activeSection!, selectedBlockId, 'center')}
+                      className={`p-2 rounded hover:bg-gray-200 transition-colors ${
+                        textFormatting.alignment === 'center' ? 'bg-gray-300' : ''
                       }`}
                     >
                       <AlignCenter className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        const newFormatting = { alignment: 'right' as 'right' };
-                        setTextFormatting(prev => ({ ...prev, ...newFormatting }));
-                        updateBlockFormatting(activeChapter!, activeSection!, selectedBlockId, newFormatting);
-                      }}
-                      className={`p-2 rounded transition-colors ${
-                        textFormatting.alignment === 'right' ? 'bg-red-500 text-white' : 'bg-white hover:bg-gray-100'
+                      onClick={() => applyFormatting(activeChapter!, activeSection!, selectedBlockId, 'right')}
+                      className={`p-2 rounded hover:bg-gray-200 transition-colors ${
+                        textFormatting.alignment === 'right' ? 'bg-gray-300' : ''
                       }`}
                     >
                       <AlignRight className="h-4 w-4" />
@@ -901,110 +923,188 @@ className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-2 rounded-lg t
               <div className="flex-1 p-4 overflow-y-auto">
                 <div className="space-y-4">
                   {activeSectionData.content.map((block, index) => (
-                    <div key={block.id} className="group relative">
-                      <div className="flex items-start gap-3">
-                        <div className="flex flex-col items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            className="text-gray-400 hover:text-gray-600 cursor-move"
-                          >
-                            <GripVertical className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteContentBlock(activeChapter!, activeSection!, block.id)}
-                            className="text-red-400 hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex-1">
-                          {block.type === 'text' ? (
-                            <textarea
-                              value={block.content}
-                              onChange={(e) => updateSectionContent(activeChapter!, activeSection!, block.id, e.target.value)}
-                              onFocus={() => {
-                                setSelectedBlockId(block.id);
-                                setTextFormatting(block.formatting || {
-                                  bold: false,
-                                  italic: false,
-                                  list: false,
-                                  alignment: 'left'
-                                });
-                              }}
-                              onBlur={() => setSelectedBlockId(null)}
-                              placeholder="Tapez votre contenu ici..."
-                              className={`w-full min-h-[100px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors resize-none ${
-                                block.formatting?.bold ? 'font-bold' : ''
-                              } ${
-                                block.formatting?.italic ? 'italic' : ''
-                              } ${
-                                block.formatting?.alignment === 'center' ? 'text-center' : 
-                                block.formatting?.alignment === 'right' ? 'text-right' : 'text-left'
-                              }`}
-                              style={{
-                                listStyle: block.formatting?.list ? 'disc' : 'none'
-                              }}
-                            />
-                          ) : (
-                            <div className="border border-gray-300 rounded-lg p-4">
-                              {block.media ? (
-                                <div className={`text-${block.media.alignment}`}>
-                                  {block.media.type === 'image' ? (
-                                    <img
-                                      src={block.media.url}
-                                      alt={block.media.caption || 'Contenu média'}
-                                      className="max-w-full h-auto rounded-lg"
-                                    />
-                                  ) : (
-                                    <video
-                                      src={block.media.url}
-                                      controls
-                                      className="max-w-full h-auto rounded-lg"
-                                    />
-                                  )}
-                                  {block.media.caption && (
-                                    <p className="text-sm text-gray-600 mt-2 italic">
-                                      {block.media.caption}
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="text-center py-8 text-gray-500">
-                                  <div className="text-4xl mb-2">📁</div>
-                                  <p>Média en attente d'upload</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                    <div
+                      key={block.id}
+                      className="group relative border border-transparent hover:border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                    >
+                      {/* Poignée de déplacement */}
+                      <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <GripVertical className="h-5 w-5 text-gray-400 cursor-move" />
                       </div>
+
+                      {/* Bouton de suppression */}
+                      <button
+                        type="button"
+                        onClick={() => deleteContentBlock(activeChapter!, activeSection!, block.id)}
+                        className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+
+                      {/* Contenu du bloc */}
+                      {block.type === 'text' ? (
+                        <textarea
+                          value={block.content}
+                          onChange={(e) => updateSectionContent(activeChapter!, activeSection!, block.id, e.target.value)}
+                          onFocus={() => {
+                            setSelectedBlockId(block.id);
+                            setTextFormatting({
+                              bold: block.formatting?.bold || false,
+                              italic: block.formatting?.italic || false,
+                              list: block.formatting?.list || false,
+                              alignment: block.formatting?.alignment || 'left'
+                            });
+                          }}
+                          onBlur={() => setSelectedBlockId(null)}
+                          placeholder="Tapez votre contenu ici..."
+                          className={`w-full min-h-[100px] p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none ${
+                            block.formatting?.bold ? 'font-bold' : ''
+                          } ${
+                            block.formatting?.italic ? 'italic' : ''
+                          } ${
+                            block.formatting?.alignment === 'center' ? 'text-center' : 
+                            block.formatting?.alignment === 'right' ? 'text-right' : 'text-left'
+                          }`}
+                          style={{
+                            listStyleType: block.formatting?.list ? 'disc' : 'none',
+                            paddingLeft: block.formatting?.list ? '2rem' : '0.75rem'
+                          }}
+                        />
+                      ) : block.type === 'media' && block.media ? (
+                        <div className={`flex justify-${block.media.alignment}`}>
+                          <div className="max-w-md">
+                            {block.media.type === 'image' ? (
+                              <img
+                                src={block.media.url}
+                                alt={block.media.caption || 'Image du cours'}
+                                className="w-full h-auto rounded-lg shadow-md"
+                              />
+                            ) : (
+                              <video
+                                src={block.media.url}
+                                controls
+                                className="w-full h-auto rounded-lg shadow-md"
+                              />
+                            )}
+                            {block.media.caption && (
+                              <p className="text-sm text-gray-600 mt-2 text-center italic">
+                                {block.media.caption}
+                              </p>
+                            )}
+                            
+                            {/* Contrôles d'alignement des médias */}
+                            <div className="flex justify-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (block.media) {
+                                    const updatedMedia = { ...block.media, alignment: 'left' as const };
+                                    updateSectionContent(activeChapter!, activeSection!, block.id, '');
+                                    // Mise à jour du média - vous devrez adapter selon votre structure
+                                  }
+                                }}
+                                className="p-1 text-gray-500 hover:text-gray-700"
+                              >
+                                <AlignLeft className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (block.media) {
+                                    const updatedMedia = { ...block.media, alignment: 'center' as const };
+                                    // Mise à jour du média
+                                  }
+                                }}
+                                className="p-1 text-gray-500 hover:text-gray-700"
+                              >
+                                <AlignCenter className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (block.media) {
+                                    const updatedMedia = { ...block.media, alignment: 'right' as const };
+                                    // Mise à jour du média
+                                  }
+                                }}
+                                className="p-1 text-gray-500 hover:text-gray-700"
+                              >
+                                <AlignRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-32 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
+                          <div className="text-center">
+                            <div className="text-4xl text-gray-400 mb-2">📄</div>
+                            <div className="text-sm text-gray-500">Bloc de contenu vide</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
 
+                  {/* Message si pas de contenu */}
                   {activeSectionData.content.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p className="text-lg font-medium mb-2">Section vide</p>
-                      <p className="text-sm">Ajoutez du contenu en utilisant les boutons ci-dessus</p>
+                    <div className="text-center py-12">
+                      <div className="text-6xl text-gray-300 mb-4">📝</div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        Cette section est vide
+                      </h3>
+                      <p className="text-gray-500 mb-6">
+                        Commencez par ajouter du contenu à cette section
+                      </p>
+                      <div className="flex justify-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => addContentBlock(activeChapter!, activeSection!, 'text')}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                        >
+                          <Type className="h-4 w-4" />
+                          Ajouter du texte
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => imageUploadRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+                        >
+                          <ImageIcon className="h-4 w-4" />
+                          Ajouter une image
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-gray-500">
+            /* État par défaut quand aucune section n'est sélectionnée */
+            <div className="h-full flex items-center justify-center">
               <div className="text-center">
-                <BookOpen className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <p className="text-xl font-medium mb-2">Sélectionnez une section</p>
-                <p className="text-sm">Choisissez un chapitre et une section pour commencer l'édition</p>
+                <div className="text-6xl text-gray-300 mb-6">📚</div>
+                <h3 className="text-xl font-medium text-gray-900 mb-2">
+                  Éditeur de Contenu
+                </h3>
+                <p className="text-gray-500 mb-6 max-w-md">
+                  Sélectionnez un chapitre et une section dans la sidebar pour commencer à éditer le contenu de votre cours.
+                </p>
+                {chapters.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={addChapter}
+                    className="flex items-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors mx-auto"
+                  >
+                    <Plus className="h-5 w-5" />
+                    Créer votre premier chapitre
+                  </button>
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Inputs cachés pour upload de médias */}
+        {/* Inputs cachés pour les uploads */}
         <input
           ref={imageUploadRef}
           type="file"
@@ -1027,93 +1127,100 @@ className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-2 rounded-lg t
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {course ? 'Modifier le cours' : 'Nouveau cours'}
-            </h2>
-            <p className="text-gray-600 mt-1">
-              {currentView === 'basic' 
-                ? 'Configurez les informations de base de votre cours'
-                : 'Structurez et rédigez le contenu de votre cours'
-              }
-            </p>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-4">
+            <div className="bg-red-500 text-white p-3 rounded-full">
+              <BookOpen className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {course ? 'Modifier le Cours' : 'Créer un Nouveau Cours'}
+              </h2>
+              <p className="text-gray-500">
+                {currentView === 'basic' 
+                  ? 'Configurez les informations de base de votre cours' 
+                  : 'Structurez et rédigez le contenu de votre cours'
+                }
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Navigation tabs */}
-        <div className="flex border-b border-gray-200">
+        {/* Navigation entre les vues */}
+        <div className="flex border-b border-gray-200 bg-white">
           <button
             type="button"
             onClick={() => setCurrentView('basic')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+            className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
               currentView === 'basic'
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <div className="flex items-center justify-center gap-2">
-              <Settings className="h-5 w-5" />
-              Informations de base
-            </div>
+            📋 Informations de Base
           </button>
           <button
             type="button"
             onClick={() => setCurrentView('content')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+            className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
               currentView === 'content'
                 ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <div className="flex items-center justify-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Contenu du cours
-            </div>
+            ✍️ Contenu du Cours
           </button>
         </div>
 
         {/* Contenu principal */}
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <div className="flex-1 p-6 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
             {currentView === 'basic' ? renderBasicForm() : renderContentEditor()}
           </div>
 
-          {/* Footer avec actions */}
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-            <div className="text-sm text-gray-500">
-              {currentView === 'basic' 
-                ? 'Remplissez tous les champs obligatoires avant de passer au contenu'
-                : `${chapters.length} chapitre(s) • ${chapters.reduce((acc, ch) => acc + ch.sections.length, 0)} section(s)`
-              }
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={uploading || !formData.title.trim()}
-                className="bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg transition-colors flex items-center gap-2"
-              >
-                {uploading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                ) : (
-                  <Save className="h-5 w-5" />
-                )}
-                {uploading ? 'Sauvegarde...' : 'Sauvegarder'}
-              </button>
+          {/* Footer avec boutons d'action */}
+          <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                {currentView === 'basic' 
+                  ? '* Champs obligatoires' 
+                  : `${chapters.length} chapitre(s) • ${chapters.reduce((acc, ch) => acc + ch.sections.length, 0)} section(s)`
+                }
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                  disabled={uploading}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading || !formData.title}
+                  className="flex items-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Sauvegarde...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      {course ? 'Mettre à Jour' : 'Créer le Cours'}
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </form>

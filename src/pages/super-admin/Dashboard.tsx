@@ -49,34 +49,46 @@ const SuperAdminDashboard = () => {
     fetchRecentActivity();
   }, []);
 
-if (!companyStats || typeof companyStats !== 'object') {
-  return <div>Aucune donnée d’analyse disponible</div>;
-}
+  // Vérification robuste des données companyStats
+  if (!companyStats || typeof companyStats !== 'object') {
+    return <div>Aucune donnée d'analyse disponible</div>;
+  }
 
+  // Filtrer et sécuriser les données des entreprises
+  const validCompanies = Object.values(companyStats).filter(company => 
+    company && typeof company === 'object'
+  );
+
+  // Calcul sécurisé des statistiques avec valeurs par défaut
   const stats = {
-    companies: Object.keys(companyStats).length,
-    totalStudents: Object.values(companyStats).reduce((acc: number, company: any) => 
-      acc + company.studentCount, 0),
-    completedCourses: Object.values(companyStats).reduce((acc: number, company: any) => 
-      acc + company.completedCourses, 0),
-    inProgressCourses: Object.values(companyStats).reduce((acc: number, company: any) => 
-      acc + company.inProgressCourses, 0)
+    companies: validCompanies.length,
+    totalStudents: validCompanies.reduce((acc: number, company: any) => 
+      acc + (company?.studentCount || 0), 0),
+    completedCourses: validCompanies.reduce((acc: number, company: any) => 
+      acc + (company?.completedCourses || 0), 0),
+    inProgressCourses: validCompanies.reduce((acc: number, company: any) => 
+      acc + (company?.inProgressCourses || 0), 0)
   };
 
+  // Données pour le graphique doughnut avec gestion des cas vides
   const progressData = {
     labels: ['Terminés', 'En cours'],
     datasets: [{
-      data: [stats.completedCourses, stats.inProgressCourses],
+      data: [stats.completedCourses || 0, stats.inProgressCourses || 0],
       backgroundColor: ['#29B275', '#FF5C29']
     }]
   };
 
+  // Données pour le graphique linéaire avec protection des accès
   const companyProgressData = {
-    labels: Object.values(companyStats).map((company: any) => company.name),
+    labels: validCompanies.map((company: any) => company?.name || 'Nom inconnu'),
     datasets: [{
       label: 'Taux de complétion',
-      data: Object.values(companyStats).map((company: any) => 
-        (company.completedCourses / company.totalEnrollments) * 100 || 0),
+      data: validCompanies.map((company: any) => {
+        const completed = company?.completedCourses || 0;
+        const total = company?.totalEnrollments || 0;
+        return total > 0 ? (completed / total) * 100 : 0;
+      }),
       borderColor: '#2B4DB8',
       tension: 0.3
     }]
@@ -180,23 +192,29 @@ if (!companyStats || typeof companyStats !== 'object') {
         >
           <Card title="Progression globale">
             <div className="h-80">
-              <Line 
-                data={companyProgressData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      max: 100,
-                      title: {
-                        display: true,
-                        text: 'Pourcentage'
+              {validCompanies.length > 0 ? (
+                <Line 
+                  data={companyProgressData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                          display: true,
+                          text: 'Pourcentage'
+                        }
                       }
                     }
-                  }
-                }}
-              />
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  Aucune donnée disponible
+                </div>
+              )}
             </div>
           </Card>
         </motion.div>
@@ -209,18 +227,24 @@ if (!companyStats || typeof companyStats !== 'object') {
           <Card title="État des cours">
             <div className="flex justify-center">
               <div className="w-64">
-                <Doughnut 
-                  data={progressData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: 'bottom'
+                {(stats.completedCourses > 0 || stats.inProgressCourses > 0) ? (
+                  <Doughnut 
+                    data={progressData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'bottom'
+                        }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    Aucun cours disponible
+                  </div>
+                )}
               </div>
             </div>
           </Card>
@@ -235,28 +259,43 @@ if (!companyStats || typeof companyStats !== 'object') {
       >
         <Card title="Activité récente">
           <div className="space-y-4">
-            {Array.isArray(recentActivity) && recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-4 p-4 border-b border-gray-200 last:border-0">
-                <div className="p-2 bg-gray-100 rounded-full">
-                  <Activity className="h-5 w-5 text-gray-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-900">
-                    <span className="font-medium">{activity.users.name}</span>
-                    {' '}{activity.action}{' '}
-                    <span className="text-gray-500">{activity.entity_type}</span>
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {format(new Date(activity.created_at), 'PPp')}
-                  </p>
-                </div>
-                {activity.users.companies && (
-                  <span className="text-xs font-medium text-gray-500">
-                    {activity.users.companies.name}
-                  </span>
-                )}
+            {Array.isArray(recentActivity) && recentActivity.length > 0 ? (
+              recentActivity
+                .filter(activity => activity && typeof activity === 'object') // Filtrer les activités invalides
+                .map((activity) => (
+                  <div key={activity?.id || Math.random()} className="flex items-start space-x-4 p-4 border-b border-gray-200 last:border-0">
+                    <div className="p-2 bg-gray-100 rounded-full">
+                      <Activity className="h-5 w-5 text-gray-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">
+                          {activity?.users?.name || 'Utilisateur inconnu'}
+                        </span>
+                        {' '}{activity?.action || 'Action inconnue'}{' '}
+                        <span className="text-gray-500">
+                          {activity?.entity_type || 'élément'}
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {activity?.created_at ? 
+                          format(new Date(activity.created_at), 'PPp') : 
+                          'Date inconnue'
+                        }
+                      </p>
+                    </div>
+                    {activity?.users?.companies?.name && (
+                      <span className="text-xs font-medium text-gray-500">
+                        {activity.users.companies.name}
+                      </span>
+                    )}
+                  </div>
+                ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Aucune activité récente disponible
               </div>
-            ))}
+            )}
           </div>
         </Card>
       </motion.div>

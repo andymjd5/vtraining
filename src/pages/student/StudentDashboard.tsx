@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../config/firebase';
-import { Play, Clock, User, BookOpen, Star, ChevronRight } from 'lucide-react';
+import { Play, Clock, User, BookOpen, Star, ChevronRight, Filter } from 'lucide-react';
 
 interface Course {
   id: string;
   title: string;
   description: string;
   level: 'Débutant' | 'Intermédiaire' | 'Avancé';
+  category: string; // Obligatoire
+  subcategory?: string; // Optionnel
   instructor: {
     name: string;
     title: string;
@@ -95,6 +97,21 @@ const StudentDashboard: React.FC = () => {
     }
   };
 
+  const getCategoryColor = (category: string) => {
+    // Couleurs pour les catégories - vous pouvez personnaliser selon vos catégories
+    const colors = {
+      'Développement Web': 'bg-blue-500 text-white',
+      'Design': 'bg-purple-500 text-white',
+      'Marketing': 'bg-pink-500 text-white',
+      'Gestion': 'bg-orange-500 text-white',
+      'Communication': 'bg-green-500 text-white',
+      'Techniques': 'bg-red-500 text-white',
+      'Formation': 'bg-indigo-500 text-white',
+      'default': 'bg-gray-500 text-white'
+    };
+    return colors[category as keyof typeof colors] || colors.default;
+  };
+
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -113,6 +130,11 @@ const StudentDashboard: React.FC = () => {
   const getButtonText = (course: Course) => {
     const progress = getProgressPercentage(course);
     return progress > 0 ? 'Continuer' : 'Démarrer';
+  };
+
+  // Optionnel : fonction pour récupérer les catégories uniques (pour un futur filtre)
+  const getUniqueCategories = () => {
+    return [...new Set(courses.map(course => course.category))];
   };
 
   if (loading) {
@@ -167,6 +189,13 @@ const StudentDashboard: React.FC = () => {
                 <p className="text-sm text-gray-500">Cours disponibles</p>
                 <p className="text-2xl font-bold text-blue-600">{courses.length}</p>
               </div>
+              {/* Optionnel : Bouton pour un futur filtre par catégorie */}
+              {/* 
+              <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <Filter className="w-4 h-4" />
+                <span>Filtrer</span>
+              </button>
+              */}
             </div>
           </div>
         </div>
@@ -195,6 +224,18 @@ const StudentDashboard: React.FC = () => {
                 <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
+                      {/* Catégorie et sous-catégorie */}
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(course.category)}`}>
+                          {course.category}
+                        </span>
+                        {course.subcategory && (
+                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-white bg-opacity-20 text-white border border-white border-opacity-30">
+                            {course.subcategory}
+                          </span>
+                        )}
+                      </div>
+                      
                       <h2 className="text-2xl font-bold mb-2">{course.title}</h2>
                       <p className="text-blue-100 mb-3 line-clamp-2">{course.description}</p>
                       <div className="flex items-center space-x-4">

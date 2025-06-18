@@ -68,7 +68,7 @@ function App() {
             path="/login"
             element={
               isAuthenticated 
-                ? <Navigate to={user?.role === UserRole.STUDENT ? '/dashboard' : `/${user?.role.toLowerCase()}/dashboard`} replace /> 
+                ? <Navigate to={user?.role === UserRole.STUDENT ? '/student/dashboard' : `/${user?.role.toLowerCase()}/dashboard`} replace /> 
                 : <CompanySelection />
             }
           />
@@ -76,7 +76,7 @@ function App() {
             path="/login/:companyId"
             element={
               isAuthenticated 
-                ? <Navigate to="/dashboard" replace /> 
+                ? <Navigate to={user?.role === UserRole.STUDENT ? '/student/dashboard' : `/${user?.role.toLowerCase()}/dashboard`} replace /> 
                 : <Login />
             }
           />
@@ -97,22 +97,41 @@ function App() {
             }
           />
 
-          {/* Student routes */}
+          {/* Student routes - Mise à jour pour correspondre au Dashboard */}
           <Route
-            path="/dashboard"
+            path="/student"
             element={
               <RoleProtectedRoute allowedRoles={[UserRole.STUDENT]}>
                 <Layout isAuthenticated />
               </RoleProtectedRoute>
             }
           >
-            <Route index element={<StudentDashboard />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="courses" element={<StudentCourses />} />
             <Route path="courses/:courseId" element={<CourseView />} />
             <Route path="quiz/:quizId" element={<QuizView />} />
             <Route path="certificates" element={<Certificates />} />
             <Route path="profile" element={<Profile />} />
           </Route>
+
+          {/* Ancienne route dashboard - redirection vers la nouvelle structure */}
+          <Route
+            path="/dashboard"
+            element={
+              <RoleProtectedRoute allowedRoles={[UserRole.STUDENT]}>
+                <Navigate to="/student/dashboard" replace />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/*"
+            element={
+              <RoleProtectedRoute allowedRoles={[UserRole.STUDENT]}>
+                <Navigate to="/student/dashboard" replace />
+              </RoleProtectedRoute>
+            }
+          />
 
           {/* Company admin routes */}
           <Route
@@ -142,7 +161,7 @@ function App() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="companies" element={<CompanyManagement />} />
             <Route path="courses" element={<CourseManagement />} />
-			<Route path="courses/assign" element={<CourseAssignment />} />
+            <Route path="courses/assign" element={<CourseAssignment />} />
             <Route path="users" element={<AdminUserManagement />} />
           </Route>
 
