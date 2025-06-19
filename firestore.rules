@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.role == 'SUPER_ADMIN' || 
+         request.auth.token.role == 'COMPANY_ADMIN');
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'SUPER_ADMIN';
+    }
+    
+    function isCompanyAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'COMPANY_ADMIN';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && 
+        (request.auth.token.role == 'STUDENT' || request.auth.token.role == 'AGENT');
+    }
+    
+    function belongsToCompany(companyId) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+    
+    function isUserOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && 
+        (isUserOwner(userId) || 
+         isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(resource.data.companyId)));
+      
+      allow create: if isSuperAdmin() || 
+        (isCompanyAdmin() && request.resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+      
+      allow update: if isUserOwner(userId) || 
+        isSuperAdmin() || 
+        (isCompanyAdmin() && resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+      
+      allow delete: if isSuperAdmin() || 
+        (isCompanyAdmin() && resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId);
+    }
+    
+    // Companies collection
+    match /companies/{companyId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSuperAdmin();
+    }
+    
+    // Courses collection
+    match /courses/{courseId} {
+      allow read: if isAuthenticated();
+      
+      allow create, update, delete: if isSuperAdmin();
+      
+      // Allow company admins to read courses assigned to their company
+      allow read: if isCompanyAdmin() && 
+        resource.data.assignedTo.hasAny([get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId]);
+    }
+    
+    // Enrollments collection
+    match /enrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(resource.data.companyId)) || 
+         isUserOwner(resource.data.userId));
+      
+      allow create: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(request.resource.data.companyId)));
+      
+      allow update: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(resource.data.companyId)) || 
+         isUserOwner(resource.data.userId));
+      
+      allow delete: if isSuperAdmin() || 
+        (isCompanyAdmin() && belongsToCompany(resource.data.companyId));
+    }
+    
+    // Progress tracking collection
+    match /progress_tracking/{progressId} {
+      allow read: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(resource.data.companyId)) || 
+         isUserOwner(resource.data.userId));
+      
+      allow create, update: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(request.resource.data.companyId)) || 
+         isUserOwner(request.resource.data.userId));
+      
+      allow delete: if isSuperAdmin() || 
+        (isCompanyAdmin() && belongsToCompany(resource.data.companyId));
+    }
+    
+    // Certificates collection
+    match /certificates/{certificateId} {
+      allow read: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(resource.data.companyId)) || 
+         isUserOwner(resource.data.userId));
+      
+      allow create: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(request.resource.data.companyId)));
+      
+      allow update, delete: if isSuperAdmin();
+    }
+    
+    // Company files collection
+    match /companyFiles/{fileId} {
+      allow read: if isAuthenticated() && 
+        (isSuperAdmin() || belongsToCompany(resource.data.companyId));
+      
+      allow create: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(request.resource.data.companyId)));
+      
+      allow update, delete: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(resource.data.companyId)));
+    }
+    
+    // Activity logs collection
+    match /activity_logs/{logId} {
+      allow read: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(resource.data.companyId)));
+      
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin();
+    }
+  }
+}

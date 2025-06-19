@@ -1,0 +1,60 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'SUPER_ADMIN';
+    }
+    
+    function isCompanyAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'COMPANY_ADMIN';
+    }
+    
+    function belongsToCompany(companyId) {
+      return isAuthenticated() && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+    
+    // Company logos
+    match /company-logos/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    
+    // Company files
+    match /companies/{companyId}/files/{fileName} {
+      allow read: if isAuthenticated() && 
+        (isSuperAdmin() || belongsToCompany(companyId));
+      
+      allow write: if isAuthenticated() && 
+        (isSuperAdmin() || 
+         (isCompanyAdmin() && belongsToCompany(companyId))) &&
+        request.resource.size < 10 * 1024 * 1024 && // 10MB limit
+        request.resource.contentType.matches('application/(pdf|msword|vnd\\.openxmlformats-officedocument\\.(wordprocessingml\\.document|spreadsheetml\\.sheet))|application/vnd\\.ms-excel|image/(jpeg|png|gif)|video/(mp4|quicktime)');
+    }
+    
+    // Course materials
+    match /courses/{courseId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    
+    // User profile pictures
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        (request.auth.uid == userId || isSuperAdmin()) &&
+        request.resource.size < 5 * 1024 * 1024 && // 5MB limit
+        request.resource.contentType.matches('image/(jpeg|png|gif)');
+    }
+    
+    // Default rule - deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

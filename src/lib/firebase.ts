@@ -22,4 +22,22 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app); // ✅ Ajout manquant
+export const functions = getFunctions(app);
+
+// Set custom claims for user roles
+export const setUserRole = async (uid: string, role: string) => {
+  try {
+    // This would typically be done through a Cloud Function
+    console.log(`Setting role ${role} for user ${uid}`);
+    // In a real implementation, you would call a Cloud Function here
+  } catch (error) {
+    console.error('Error setting user role:', error);
+    throw error;
+  }
+};
+
+// Initialize collections with security rules
+export const initializeFirebaseRules = async () => {
+  // This is just a placeholder - in a real app, you would set up security rules in the Firebase console
+  console.log('Initializing Firebase security rules');
+};

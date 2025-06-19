@@ -28,7 +28,7 @@ const Layout = ({ isAuthenticated = false }: LayoutProps) => {
         </main>
       </div>
       
-      {!isAuthenticated && <Footer />}
+      <Footer />
     </div>
   );
 };

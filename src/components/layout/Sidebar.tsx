@@ -67,7 +67,7 @@ const Sidebar = ({ userRole }: SidebarProps) => {
   const navItems = getNavItems();
 
   return (
-    <div className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200 overflow-y-auto z-30">
+    <div className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-red-600 overflow-y-auto z-30">
       <div className="p-4">
         <div className="space-y-1">
           {navItems.map((item) => (
@@ -78,7 +78,7 @@ const Sidebar = ({ userRole }: SidebarProps) => {
                 `flex items-center px-4 py-3 rounded-lg transition-all duration-200 group ${
                   isActive 
                     ? 'bg-black text-white' 
-                    : 'text-gray-700 hover:bg-black hover:text-white'
+                    : 'text-white hover:bg-black hover:text-white'
                 }`
               }
             >
@@ -88,10 +88,10 @@ const Sidebar = ({ userRole }: SidebarProps) => {
           ))}
         </div>
 
-        <div className="mt-8 pt-4 border-t border-gray-200">
+        <div className="mt-8 pt-4 border-t border-red-500">
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-black hover:text-white rounded-lg transition-all duration-200"
+            className="flex items-center w-full px-4 py-3 text-white hover:bg-black hover:text-white rounded-lg transition-all duration-200"
           >
             <LogOut className="h-5 w-5 mr-3" />
             <span className="font-medium">Déconnexion</span>
