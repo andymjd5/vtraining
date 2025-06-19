@@ -28,7 +28,9 @@ const Profile = lazy(() => import('./pages/student/Profile'));
 // Company admin pages
 const CompanyAdminDashboard = lazy(() => import('./pages/company-admin/Dashboard'));
 const CompanyUserManagement = lazy(() => import('./pages/company-admin/UserManagement'));
+const AssignedCourses = lazy(() => import('./pages/company-admin/AssignedCourses'));
 const CompanyReports = lazy(() => import('./pages/company-admin/Reports'));
+const CompanySettings = lazy(() => import('./pages/company-admin/Settings'));
 
 // Super admin pages
 const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'));
@@ -36,7 +38,8 @@ const CompanyManagement = lazy(() => import('./pages/super-admin/CompanyManageme
 const CourseManagement = lazy(() => import('./pages/super-admin/CourseManagement'));
 const AdminUserManagement = lazy(() => import('./pages/super-admin/UserManagement'));
 const CourseAssignment = lazy(() => import('./pages/super-admin/CourseAssignment'));
-
+const SuperAdminReports = lazy(() => import('./pages/super-admin/Reports'));
+const SuperAdminSettings = lazy(() => import('./pages/super-admin/Settings'));
 
 function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -68,7 +71,7 @@ function App() {
             path="/login"
             element={
               isAuthenticated 
-                ? <Navigate to={user?.role === UserRole.STUDENT ? '/student/dashboard' : `/${user?.role.toLowerCase()}/dashboard`} replace /> 
+                ? <Navigate to={user?.role === UserRole.STUDENT ? '/student/dashboard' : `/${user?.role.toLowerCase().replace('_', '-')}/dashboard`} replace /> 
                 : <CompanySelection />
             }
           />
@@ -76,7 +79,7 @@ function App() {
             path="/login/:companyId"
             element={
               isAuthenticated 
-                ? <Navigate to={user?.role === UserRole.STUDENT ? '/student/dashboard' : `/${user?.role.toLowerCase()}/dashboard`} replace /> 
+                ? <Navigate to={user?.role === UserRole.STUDENT ? '/student/dashboard' : `/${user?.role.toLowerCase().replace('_', '-')}/dashboard`} replace /> 
                 : <Login />
             }
           />
@@ -97,7 +100,7 @@ function App() {
             }
           />
 
-          {/* Student routes - Mise à jour pour correspondre au Dashboard */}
+          {/* Student routes */}
           <Route
             path="/student"
             element={
@@ -115,7 +118,7 @@ function App() {
             <Route path="profile" element={<Profile />} />
           </Route>
 
-          {/* Ancienne route dashboard - redirection vers la nouvelle structure */}
+          {/* Legacy dashboard route redirect */}
           <Route
             path="/dashboard"
             element={
@@ -145,7 +148,9 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<CompanyAdminDashboard />} />
             <Route path="users" element={<CompanyUserManagement />} />
+            <Route path="assigned-courses" element={<AssignedCourses />} />
             <Route path="reports" element={<CompanyReports />} />
+            <Route path="settings" element={<CompanySettings />} />
           </Route>
 
           {/* Super admin routes */}
@@ -163,6 +168,8 @@ function App() {
             <Route path="courses" element={<CourseManagement />} />
             <Route path="courses/assign" element={<CourseAssignment />} />
             <Route path="users" element={<AdminUserManagement />} />
+            <Route path="reports" element={<SuperAdminReports />} />
+            <Route path="settings" element={<SuperAdminSettings />} />
           </Route>
 
           {/* Catch-all */}

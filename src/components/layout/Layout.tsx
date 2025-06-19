@@ -21,14 +21,14 @@ const Layout = ({ isAuthenticated = false }: LayoutProps) => {
           <Sidebar userRole={user.role} />
         )}
         
-        <main className={`flex-grow ${isAuthenticated ? 'ml-0 md:ml-64' : ''}`}>
-          <div className="container mx-auto px-4 py-6">
+        <main className={`flex-grow ${isAuthenticated ? 'ml-64' : ''} min-h-[calc(100vh-4rem)]`}>
+          <div className="p-6">
             <Outlet />
           </div>
         </main>
       </div>
       
-      <Footer />
+      {!isAuthenticated && <Footer />}
     </div>
   );
 };
