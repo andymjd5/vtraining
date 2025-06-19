@@ -7,7 +7,7 @@ import {
   query, 
   orderBy 
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db } from '../../lib/firebase';
 import { toast } from 'react-hot-toast';
 
 // Types
