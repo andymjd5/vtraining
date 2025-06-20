@@ -6,13 +6,13 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UserRole } from '../types';
 
 interface User {
   id: string;
-  uid: string; // Ajout explicite de uid pour compatibilité
+  uid: string;
   email: string;
   role: UserRole;
   companyId?: string;
@@ -23,21 +23,21 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  initializing: boolean; // Nouvel état pour le chargement initial
+  initializing: boolean;
   error: string | null;
 }
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, expectedRole?: UserRole) => Promise<void>;
   logout: () => Promise<void>;
-  loading: boolean; // Alias pour initializing (pour compatibilité)
+  loading: boolean;
 }
 
 const defaultAuthState: AuthState = {
   user: null,
   isAuthenticated: false,
   isLoading: false,
-  initializing: true, // Par défaut à true car on initialise
+  initializing: true,
   error: null,
 };
 
@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           user: null,
           isAuthenticated: false,
           isLoading: false,
-          initializing: false, // Fini d'initialiser
+          initializing: false,
           error: null,
         });
       }
@@ -103,18 +103,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         throw new Error('User profile not found');
       }
 
-      const rawData = userDoc.data();
-      const userData = {
-        ...rawData,
-        role: String(rawData.role),
-      } as User;
+      const userData = userDoc.data();
+      
+      // Update last login time
+      await setDoc(userDocRef, {
+        lastLogin: serverTimestamp()
+      }, { merge: true });
 
       console.log('AuthProvider: User data fetched successfully', userData);
 
       setAuthState({
         user: {
           id: firebaseUser.uid,
-          uid: firebaseUser.uid, // Ajout explicite
+          uid: firebaseUser.uid,
           email: firebaseUser.email!,
           role: userData.role,
           companyId: userData.companyId,
@@ -122,7 +123,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         },
         isAuthenticated: true,
         isLoading: false,
-        initializing: false, // Fini d'initialiser
+        initializing: false,
         error: null,
       });
     } catch (error) {
@@ -131,7 +132,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        initializing: false, // Fini d'initialiser même en cas d'erreur
+        initializing: false,
         error: 'Error fetching user data',
       });
     }
@@ -146,7 +147,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         navigate('/company-admin/dashboard');
         break;
       case UserRole.STUDENT:
-        navigate('/dashboard');
+        navigate('/student/dashboard');
         break;
       default:
         navigate('/login');
@@ -161,24 +162,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
 
-      // DEBUG: Ajout log UID
-      console.log("DEBUG: Login - Firebase UID utilisé:", firebaseUser.uid);
+      // DEBUG: Add UID log
+      console.log("DEBUG: Login - Firebase UID used:", firebaseUser.uid);
 
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       const userDoc = await getDoc(userDocRef);
 
-      // DEBUG: Ajout log userDoc
+      // DEBUG: Add userDoc log
       console.log("DEBUG: userDoc.id =", userDoc.id, "| exists =", userDoc.exists());
 
       if (!userDoc.exists()) {
         throw new Error('User profile not found');
       }
 
-      const rawData = userDoc.data();
-      const userData = {
-        ...rawData,
-        role: String(rawData.role),
-      } as User;
+      const userData = userDoc.data();
 
       console.log("Données utilisateur récupérées depuis Firestore :", userData);
 
@@ -190,10 +187,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         throw new Error(`Access denied: role mismatch. Expected ${expectedRole}, got ${userData.role}`);
       }
 
+      // Update last login time
+      await setDoc(userDocRef, {
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+
       setAuthState({
         user: {
           id: firebaseUser.uid,
-          uid: firebaseUser.uid, // Ajout explicite
+          uid: firebaseUser.uid,
           email: firebaseUser.email!,
           role: userData.role,
           companyId: userData.companyId,
@@ -240,10 +242,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  // Création de la valeur du contexte avec l'alias loading
+  // Create context value with loading alias
   const contextValue: AuthContextType = {
     ...authState,
-    loading: authState.initializing, // Alias pour compatibilité
+    loading: authState.initializing,
     login,
     logout,
   };

@@ -20,7 +20,7 @@ export const useAuth = () => {
         case UserRole.COMPANY_ADMIN:
           return '/company-admin/dashboard';
         case UserRole.STUDENT:
-          return '/dashboard';
+          return '/student/dashboard';
         default:
           return '/login';
       }

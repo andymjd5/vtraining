@@ -3,14 +3,14 @@
 export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
   COMPANY_ADMIN = 'COMPANY_ADMIN',
-  AGENT = 'AGENT',      // Si tu veux garder AGENT
-  STUDENT = 'STUDENT'   // Ajoute STUDENT si besoin dans ton projet
+  AGENT = 'AGENT',
+  STUDENT = 'STUDENT'
 }
 
 export interface Company {
   id: string;
   name: string;
-  urlSlug?: string;          // Peut être optionnel si non utilisé partout
+  urlSlug?: string;
   logoUrl?: string;
   contactEmail: string;
   contactPhone?: string;
@@ -23,7 +23,7 @@ export interface Company {
 export interface User {
   id: string;
   email: string;
-  name?: string;             // Peut parfois être optionnel selon la base
+  name?: string;
   fullName?: string;
   displayName?: string;
   role: UserRole;
@@ -32,7 +32,8 @@ export interface User {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-  company?: Company;         // Si tu fais du "populate"
+  company?: Company;
+  enrolledCourses?: string[];
   [key: string]: any;
 }
 
@@ -40,4 +41,117 @@ export interface LoginCredentials {
   email: string;
   password: string;
   companyId?: string;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  subcategory?: string;
+  level: string;
+  duration: number;
+  instructor: {
+    name: string;
+    title: string;
+    photoUrl?: string;
+    bio?: string;
+  };
+  chapters?: Chapter[];
+  assignedTo: string[];
+  status: 'draft' | 'published';
+  createdAt: any;
+  updatedAt?: any;
+}
+
+export interface Chapter {
+  id: string;
+  title: string;
+  order: number;
+  expanded?: boolean;
+  sections: Section[];
+}
+
+export interface Section {
+  id: string;
+  title: string;
+  order: number;
+  content: ContentBlock[];
+}
+
+export interface ContentBlock {
+  id: string;
+  type: 'text' | 'media';
+  content: string;
+  formatting?: {
+    bold?: boolean;
+    italic?: boolean;
+    list?: boolean;
+    alignment?: 'left' | 'center' | 'right';
+  };
+  media?: {
+    type: 'image' | 'video';
+    url: string;
+    caption?: string;
+  };
+}
+
+export interface Enrollment {
+  id: string;
+  userId: string;
+  courseId: string;
+  companyId: string;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  progress: number;
+  enrolledAt: any;
+  lastActivity: any;
+  timeSpent?: number;
+}
+
+export interface Certificate {
+  id: string;
+  userId: string;
+  userName: string;
+  courseId: string;
+  courseName: string;
+  companyId: string;
+  issueDate: any;
+  certificateNumber: string;
+  createdAt: any;
+}
+
+export interface ProgressTracking {
+  id: string;
+  enrollmentId: string;
+  userId: string;
+  courseId: string;
+  companyId: string;
+  chapterId: string;
+  completed: boolean;
+  timeSpent: number;
+  lastAccessed: any;
+}
+
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  companyId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  entityName?: string;
+  createdAt: any;
+}
+
+export interface CompanyFile {
+  id: string;
+  name: string;
+  originalName: string;
+  size: number;
+  type: string;
+  companyId: string;
+  path: string;
+  url: string;
+  uploadedAt: any;
+  uploadedBy: string | null;
 }
