@@ -53,11 +53,13 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
       setLoading(true);
       setError(null);
       try {
+        console.log("Fetching courses for company:", companyId);
         const q = query(
           collection(db, 'courses'),
           where('assignedTo', 'array-contains', companyId)
         );
         const querySnapshot = await getDocs(q);
+        console.log("Courses query snapshot size:", querySnapshot.size);
         const result: Course[] = [];
         querySnapshot.forEach((doc) => {
           result.push({ id: doc.id, ...doc.data() } as Course);

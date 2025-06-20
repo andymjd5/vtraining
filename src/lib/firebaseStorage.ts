@@ -170,7 +170,7 @@ export const deleteFile = async (filePath: string): Promise<void> => {
 /**
  * Delete all files for a company (useful when deleting a company)
  */
-const deleteAllCompanyFiles = async (companyId: string): Promise<void> => {
+export const deleteAllCompanyFiles = async (companyId: string): Promise<void> => {
   try {
     // Get all files for the company
     const files = await getCompanyFiles(companyId);
@@ -188,7 +188,7 @@ const deleteAllCompanyFiles = async (companyId: string): Promise<void> => {
 /**
  * Get file download URL by path
  */
-const getFileDownloadURL = async (filePath: string): Promise<string> => {
+export const getFileDownloadURL = async (filePath: string): Promise<string> => {
   try {
     const storageRef = ref(storage, filePath);
     return await getDownloadURL(storageRef);
@@ -201,7 +201,7 @@ const getFileDownloadURL = async (filePath: string): Promise<string> => {
 /**
  * Check if a file exists in storage
  */
-const fileExists = async (filePath: string): Promise<boolean> => {
+export const fileExists = async (filePath: string): Promise<boolean> => {
   try {
     const storageRef = ref(storage, filePath);
     await getMetadata(storageRef);

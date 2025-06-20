@@ -13,32 +13,32 @@ const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRouteProps)
   const { isAuthenticated, user, isLoading } = useAuth();
   const location = useLocation();
 
-  // ✅ Attente du chargement complet de l'authentification
+  // Wait for authentication to complete loading
   if (isLoading) {
     return <LoadingScreen />;
   }
 
-  // ✅ Si l'utilisateur n'est pas connecté ou non disponible
+  // If user is not authenticated or not available
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // ❌ Si l'utilisateur est connecté mais n'a pas le bon rôle
+  // If user is authenticated but doesn't have the right role
   if (!allowedRoles.includes(user.role)) {
-    // ✅ Redirection vers son dashboard correct
+    // Redirect to their correct dashboard
     switch (user.role) {
       case UserRole.SUPER_ADMIN:
         return <Navigate to="/super-admin/dashboard" replace />;
       case UserRole.COMPANY_ADMIN:
         return <Navigate to="/company-admin/dashboard" replace />;
       case UserRole.STUDENT:
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/student/dashboard" replace />;
       default:
         return <Navigate to="/login" replace />;
     }
   }
 
-  // ✅ Tout va bien : on affiche la page
+  // All good: show the page
   return <>{children}</>;
 };
 
