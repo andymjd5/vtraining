@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../hooks/useAuth';
-import { BookCheck, Users, Clock, User, CheckCircle, Plus } from 'lucide-react';
+import { BookCheck, Users, Clock, User, CheckCircle, Plus, UserX } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { useToast } from '../../hooks/useToast';
@@ -28,6 +28,17 @@ interface Student {
   enrolledCourses?: string[];
 }
 
+interface Enrollment {
+  id: string;
+  userId: string;
+  courseId: string;
+  companyId: string;
+  status: string;
+  progress: number;
+  enrolledAt: Date;
+  lastActivity: Date;
+}
+
 const AssignedCourses = () => {
   const { user } = useAuth();
   const { success, error: showError } = useToast();
@@ -36,8 +47,12 @@ const AssignedCourses = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showUnassignModal, setShowUnassignModal] = useState(false);
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
+  const [selectedEnrolledStudents, setSelectedEnrolledStudents] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
 
   useEffect(() => {
     if (user?.companyId) {
@@ -85,14 +100,55 @@ const AssignedCourses = () => {
     }
   };
 
+  const fetchEnrolledStudents = async (courseId: string) => {
+    try {
+      const q = query(
+        collection(db, 'enrollments'),
+        where('courseId', '==', courseId),
+        where('companyId', '==', user!.companyId!)
+      );
+      const querySnapshot = await getDocs(q);
+      const enrollments = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Enrollment[];
+
+      // Get student details for enrolled students
+      const enrolledStudentIds = enrollments.map(e => e.userId);
+      const enrolledStudentsData = students.filter(student =>
+        enrolledStudentIds.includes(student.id)
+      );
+
+      setEnrolledStudents(enrolledStudentsData);
+    } catch (error) {
+      console.error('Error fetching enrolled students:', error);
+      showError('Erreur lors du chargement des étudiants inscrits');
+    }
+  };
+
   const handleAssignCourse = (course: Course) => {
     setSelectedCourse(course);
     setSelectedStudents([]);
     setShowAssignModal(true);
   };
 
+  const handleUnassignCourse = async (course: Course) => {
+    setSelectedCourse(course);
+    setSelectedEnrolledStudents([]);
+    await fetchEnrolledStudents(course.id);
+    setShowUnassignModal(true);
+  };
+
   const toggleStudentSelection = (studentId: string) => {
     setSelectedStudents(prev =>
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  const toggleEnrolledStudentSelection = (studentId: string) => {
+    setSelectedEnrolledStudents(prev =>
       prev.includes(studentId)
         ? prev.filter(id => id !== studentId)
         : [...prev, studentId]
@@ -138,8 +194,54 @@ const AssignedCourses = () => {
     }
   };
 
+  const unassignCourseFromStudents = async () => {
+    if (!selectedCourse || selectedEnrolledStudents.length === 0) return;
+
+    setUnassigning(true);
+    try {
+      // Remove enrollments for selected students
+      const unassignPromises = selectedEnrolledStudents.map(async (studentId) => {
+        // Find and delete enrollment
+        const enrollmentQuery = query(
+          collection(db, 'enrollments'),
+          where('userId', '==', studentId),
+          where('courseId', '==', selectedCourse.id),
+          where('companyId', '==', user!.companyId!)
+        );
+        const enrollmentSnapshot = await getDocs(enrollmentQuery);
+
+        enrollmentSnapshot.docs.forEach(async (enrollmentDoc) => {
+          await deleteDoc(doc(db, 'enrollments', enrollmentDoc.id));
+        });
+
+        // Update user's enrolled courses
+        const userRef = doc(db, 'users', studentId);
+        await updateDoc(userRef, {
+          enrolledCourses: arrayRemove(selectedCourse.id)
+        });
+      });
+
+      await Promise.all(unassignPromises);
+
+      success(`Cours "${selectedCourse.title}" désassigné de ${selectedEnrolledStudents.length} étudiant(s)`);
+      setShowUnassignModal(false);
+      setSelectedCourse(null);
+      setSelectedEnrolledStudents([]);
+      setEnrolledStudents([]);
+    } catch (error) {
+      console.error('Error unassigning course:', error);
+      showError('Erreur lors de la désassignation du cours');
+    } finally {
+      setUnassigning(false);
+    }
+  };
+
   const assignToAllStudents = () => {
     setSelectedStudents(students.map(s => s.id));
+  };
+
+  const unassignFromAllStudents = () => {
+    setSelectedEnrolledStudents(enrolledStudents.map(s => s.id));
   };
 
   if (loading) {
@@ -203,19 +305,32 @@ const AssignedCourses = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${course.level === 'Débutant' ? 'bg-green-100 text-green-800' :
                     course.level === 'Intermédiaire' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-red-100 text-red-800'
                     }`}>
                     {course.level}
                   </span>
+                </div>
+
+                <div className="flex space-x-2">
                   <Button
                     size="sm"
                     onClick={() => handleAssignCourse(course)}
                     leftIcon={<Users className="h-4 w-4" />}
+                    className="flex-1"
                   >
                     Assigner
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outlined"
+                    onClick={() => handleUnassignCourse(course)}
+                    leftIcon={<UserX className="h-4 w-4" />}
+                    className="flex-1"
+                  >
+                    Désassigner
                   </Button>
                 </div>
               </div>
@@ -308,6 +423,97 @@ const AssignedCourses = () => {
                 isLoading={assigning}
               >
                 Assigner le cours
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unassignment Modal */}
+      {showUnassignModal && selectedCourse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    Désassigner le cours
+                  </h2>
+                  <p className="text-gray-600 text-sm mt-1">
+                    {selectedCourse.title}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowUnassignModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  {/* <X className="h-6 w-6" /> */}
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-medium text-gray-900">
+                  Étudiants inscrits ({selectedEnrolledStudents.length} sélectionnés)
+                </h3>
+                <Button
+                  variant="outlined"
+                  size="sm"
+                  onClick={unassignFromAllStudents}
+                >
+                  Sélectionner tous
+                </Button>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                {enrolledStudents.map((student) => (
+                  <div
+                    key={student.id}
+                    className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${selectedEnrolledStudents.includes(student.id) ? 'bg-red-50' : ''
+                      }`}
+                    onClick={() => toggleEnrolledStudentSelection(student.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{student.name}</p>
+                        <p className="text-sm text-gray-500">{student.email}</p>
+                      </div>
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedEnrolledStudents.includes(student.id)
+                        ? 'bg-red-500 border-red-500 text-white'
+                        : 'border-gray-300'
+                        }`}>
+                        {selectedEnrolledStudents.includes(student.id) && (
+                          <CheckCircle className="h-3 w-3" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {enrolledStudents.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  Aucun étudiant inscrit à ce cours
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <Button
+                variant="outlined"
+                onClick={() => setShowUnassignModal(false)}
+                disabled={unassigning}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={unassignCourseFromStudents}
+                disabled={selectedEnrolledStudents.length === 0 || unassigning}
+                isLoading={unassigning}
+                variant="destructive"
+              >
+                Désassigner le cours
               </Button>
             </div>
           </div>

@@ -1,0 +1,19 @@
+Superadmin
+==========
+Affectation de cours a l'etabissement :  OK
+
+
+Admin etablissement
+===================
+- Voir le cours affecte OK
+- Affecter le cours a l'etudiant OK (faut verifier la possibilite de desassigner) OK
+
+Etudiant
+========
+- Dashboard etudiant OK
+- Visualiser le cours vr4,
+- S'inscrire au cours
+	- Voir la progession du suivi du cours
+	- Continuer le cours
+	- Naviguer entre es lecons/sections
+	- Terminer le cours
