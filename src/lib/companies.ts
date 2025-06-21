@@ -10,7 +10,7 @@ export const companies: Company[] = [
   { id: 'pnjt', name: 'PNJT', logoUrl: '/partners/pnjt.png' },
   { id: 'unikin', name: 'UNIKIN', logoUrl: '/partners/unikin.png' },
   { id: 'vision26', name: 'VISION 26', logoUrl: '/partners/vision26.png' },
-  { id: '5nwpalNX8si53ZCK190Z', name: 'Redmagiccreative', logoUrl: '/partners/redmagiccreative.png' },
+  { id: '5nwpaINX8si53ZCK190Z', name: 'Redmagiccreative', logoUrl: '/partners/redmagiccreative.png' },
 ];
 
 

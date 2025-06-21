@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Edit2, Trash2, MoreVertical, CheckCircle, XCircle, Mail, Filter, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, MoreVertical, CheckCircle, XCircle, Mail, Filter, X, Users } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../hooks/useAuth';
@@ -39,7 +39,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ companyId, onClose, onSucce
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       // In a real app, you would use Firebase Auth to create the user
       // For now, we'll just add the user to Firestore
@@ -51,7 +51,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ companyId, onClose, onSucce
         status: 'active',
         createdAt: serverTimestamp()
       });
-      
+
       success('Utilisateur créé avec succès');
       onSuccess();
     } catch (error) {
@@ -68,7 +68,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ companyId, onClose, onSucce
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Ajouter un utilisateur</h2>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nom complet</label>
@@ -80,7 +80,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ companyId, onClose, onSucce
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
@@ -91,7 +91,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ companyId, onClose, onSucce
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          
+
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               variant="outlined"
@@ -131,20 +131,22 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       if (!currentUser?.companyId) return;
-      
+
       setLoading(true);
       const usersQuery = query(
         collection(db, 'users'),
         where('companyId', '==', currentUser.companyId),
         where('role', '==', 'STUDENT')
       );
-      
+
       const snapshot = await getDocs(usersQuery);
+
+      console.log('Fetched users:', snapshot.docs.length);
       const usersData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as User[];
-      
+
       setUsers(usersData);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -159,11 +161,11 @@ const UserManagement = () => {
       await updateDoc(doc(db, 'users', userId), {
         status: newStatus
       });
-      
-      setUsers(prev => prev.map(user => 
+
+      setUsers(prev => prev.map(user =>
         user.id === userId ? { ...user, status: newStatus } : user
       ));
-      
+
       success(`Statut mis à jour avec succès`);
     } catch (error) {
       console.error('Error updating user status:', error);
@@ -197,12 +199,12 @@ const UserManagement = () => {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
+    const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesStatus = !statusFilter || user.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -223,7 +225,7 @@ const UserManagement = () => {
             Gérez les utilisateurs de votre entreprise
           </p>
         </div>
-        <Button 
+        <Button
           leftIcon={<Plus className="h-5 w-5" />}
           onClick={() => setShowCreateModal(true)}
         >
@@ -257,7 +259,7 @@ const UserManagement = () => {
                 <option value="inactive">Inactif</option>
                 <option value="pending">En attente</option>
               </select>
-              
+
               <Button
                 variant="outlined"
                 size="sm"
@@ -335,14 +337,13 @@ const UserManagement = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.status === 'active' ? 'bg-green-100 text-green-800' :
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.status === 'active' ? 'bg-green-100 text-green-800' :
                           user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
+                            'bg-red-100 text-red-800'
+                          }`}>
                           {user.status === 'active' ? 'Actif' :
-                           user.status === 'pending' ? 'En attente' :
-                           'Inactif'}
+                            user.status === 'pending' ? 'En attente' :
+                              'Inactif'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -350,21 +351,21 @@ const UserManagement = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
-                          <button 
+                          <button
                             className="text-blue-600 hover:text-blue-900"
                             onClick={() => handleResetPassword(user.email)}
                             title="Réinitialiser le mot de passe"
                           >
                             <Mail className="h-5 w-5" />
                           </button>
-                          <button 
+                          <button
                             className="text-blue-600 hover:text-blue-900"
                             title="Modifier"
                           >
                             <Edit2 className="h-5 w-5" />
                           </button>
                           {user.status !== 'active' && (
-                            <button 
+                            <button
                               className="text-green-600 hover:text-green-900"
                               onClick={() => handleStatusUpdate(user.id, 'active')}
                               title="Activer"
@@ -373,7 +374,7 @@ const UserManagement = () => {
                             </button>
                           )}
                           {user.status === 'active' && (
-                            <button 
+                            <button
                               className="text-red-600 hover:text-red-900"
                               onClick={() => handleStatusUpdate(user.id, 'inactive')}
                               title="Désactiver"
@@ -381,7 +382,7 @@ const UserManagement = () => {
                               <XCircle className="h-5 w-5" />
                             </button>
                           )}
-                          <button 
+                          <button
                             className="text-red-600 hover:text-red-900"
                             onClick={() => handleDeleteUser(user.id)}
                             title="Supprimer"

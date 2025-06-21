@@ -60,7 +60,7 @@ const companies = [
     status: 'active'
   },
   {
-    id: '5nwpalNX8si53ZCK190Z',
+    id: '5nwpaINX8si53ZCK190Z',
     name: 'Redmagiccreative',
     email: 'contact@redmagiccreative.com',
     phone: '+243899774900',
@@ -116,7 +116,7 @@ const users = [
     password: 'password123',
     name: 'Admin Redmagiccreative',
     role: 'COMPANY_ADMIN',
-    companyId: '5nwpalNX8si53ZCK190Z'
+    companyId: '5nwpaINX8si53ZCK190Z'
   },
   {
     email: 'student1@besdu.org',
@@ -354,16 +354,16 @@ async function createUsers() {
         where('email', '==', user.email)
       );
       const usersSnapshot = await getDocs(usersQuery);
-      
+
       if (!usersSnapshot.empty) {
         console.log(`User ${user.email} already exists, skipping...`);
         continue;
       }
-      
+
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
       const uid = userCredential.user.uid;
-      
+
       // Create user in Firestore
       await setDoc(doc(db, 'users', uid), {
         name: user.name,
@@ -373,7 +373,7 @@ async function createUsers() {
         status: 'active',
         createdAt: serverTimestamp()
       });
-      
+
       console.log(`Created user: ${user.email}`);
     } catch (error) {
       console.error(`Error creating user ${user.email}:`, error);
@@ -401,7 +401,7 @@ async function createCourses() {
 // Function to create enrollments
 async function createEnrollments() {
   console.log('Creating enrollments...');
-  
+
   // Get all students
   const studentsQuery = query(
     collection(db, 'users'),
@@ -412,21 +412,21 @@ async function createEnrollments() {
     id: doc.id,
     ...doc.data()
   }));
-  
+
   // Get all courses
   const coursesSnapshot = await getDocs(collection(db, 'courses'));
   const allCourses = coursesSnapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   }));
-  
+
   // Create enrollments for each student
   for (const student of students) {
     // Find courses assigned to student's company
-    const studentCourses = allCourses.filter(course => 
+    const studentCourses = allCourses.filter(course =>
       course.assignedTo && course.assignedTo.includes(student.companyId)
     );
-    
+
     for (const course of studentCourses) {
       try {
         const enrollmentRef = doc(collection(db, 'enrollments'));

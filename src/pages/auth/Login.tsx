@@ -28,10 +28,10 @@ const Button: React.FC<{
   onClick?: () => void;
 }> = ({ type = "button", variant = "primary", className = "", isLoading = false, disabled = false, children, onClick }) => {
   const baseClasses = "px-4 py-2 rounded-md font-medium transition-colors duration-200 flex items-center justify-center";
-  const variantClasses = variant === "primary" 
-    ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400" 
+  const variantClasses = variant === "primary"
+    ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
     : "bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:bg-gray-100";
-  
+
   return (
     <button
       type={type}
@@ -111,7 +111,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
   const { companyId } = useParams<{ companyId: string }>();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -178,7 +178,7 @@ const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!company) return;
-    
+
     setError('');
     setIsLoading(true);
 
@@ -186,7 +186,7 @@ const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
       // 1. Authentification Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+
       // 2. Lecture du user Firestore (maintenant possible car l'utilisateur est authentifié)
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists()) {
@@ -194,8 +194,11 @@ const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
       }
 
       const userData = userDoc.data();
-      
+
       // 3. Contrôle de la cohérence entreprise
+      console.log('Check company : ', '"' + userData.companyId + '!' + company.id + '"', userData.companyId == company.id);
+      console.log('Check type id : ', typeof userData.companyId, typeof company.id);
+
       if (userData.companyId !== company.id) {
         await signOut(auth);
         throw new Error(
@@ -231,7 +234,7 @@ const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
   // Affichage du sélecteur d'entreprise
   if (showCompanySelector || !company) {
     return (
-      <CompanySelector 
+      <CompanySelector
         onCompanySelect={handleCompanySelect}
         error={error}
       />
@@ -267,14 +270,14 @@ const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
               Changer d'entreprise
             </button>
           </div>
-          
+
           {error && (
             <div className="mb-6 p-3 bg-red-50 text-red-700 rounded-md flex items-start">
               <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
               <span className="text-sm">{error}</span>
             </div>
           )}
-          
+
           <div className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -292,7 +295,7 @@ const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
                 disabled={isLoading}
               />
             </div>
-            
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Mot de passe
@@ -319,7 +322,7 @@ const Login: React.FC<LoginProps> = ({ onCompanyChange }) => {
                 </button>
               </div>
             </div>
-            
+
             <div>
               <Button
                 type="submit"

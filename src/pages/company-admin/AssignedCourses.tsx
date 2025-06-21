@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { BookCheck, Users, Clock, User, CheckCircle, Plus } from 'lucide-react';
@@ -78,6 +78,7 @@ const AssignedCourses = () => {
         id: doc.id,
         ...doc.data()
       })) as Student[];
+      console.log('Fetched students:', studentsData);
       setStudents(studentsData);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -91,7 +92,7 @@ const AssignedCourses = () => {
   };
 
   const toggleStudentSelection = (studentId: string) => {
-    setSelectedStudents(prev => 
+    setSelectedStudents(prev =>
       prev.includes(studentId)
         ? prev.filter(id => id !== studentId)
         : [...prev, studentId]
@@ -203,11 +204,10 @@ const AssignedCourses = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    course.level === 'Débutant' ? 'bg-green-100 text-green-800' :
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${course.level === 'Débutant' ? 'bg-green-100 text-green-800' :
                     course.level === 'Intermédiaire' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
+                      'bg-red-100 text-red-800'
+                    }`}>
                     {course.level}
                   </span>
                   <Button
@@ -242,7 +242,7 @@ const AssignedCourses = () => {
                   onClick={() => setShowAssignModal(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <X className="h-6 w-6" />
+                  {/* <X className="h-6 w-6" /> */}
                 </button>
               </div>
             </div>
@@ -265,9 +265,8 @@ const AssignedCourses = () => {
                 {students.map((student) => (
                   <div
                     key={student.id}
-                    className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
-                      selectedStudents.includes(student.id) ? 'bg-blue-50' : ''
-                    }`}
+                    className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${selectedStudents.includes(student.id) ? 'bg-blue-50' : ''
+                      }`}
                     onClick={() => toggleStudentSelection(student.id)}
                   >
                     <div className="flex items-center justify-between">
@@ -275,11 +274,10 @@ const AssignedCourses = () => {
                         <p className="font-medium text-gray-900">{student.name}</p>
                         <p className="text-sm text-gray-500">{student.email}</p>
                       </div>
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                        selectedStudents.includes(student.id)
-                          ? 'bg-blue-500 border-blue-500 text-white'
-                          : 'border-gray-300'
-                      }`}>
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedStudents.includes(student.id)
+                        ? 'bg-blue-500 border-blue-500 text-white'
+                        : 'border-gray-300'
+                        }`}>
                         {selectedStudents.includes(student.id) && (
                           <CheckCircle className="h-3 w-3" />
                         )}
