@@ -5,7 +5,7 @@ import {
   Bold, Italic, List, AlignLeft, AlignCenter, AlignRight,
   Trash2, GripVertical, Type
 } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, addDoc, setDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
 // Types pour la structure du contenu
@@ -440,16 +440,33 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
     setUploading(true);
 
     try {
-      // Simulation de sauvegarde - remplacez par votre logique Firebase
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      console.log('Données du cours:', {
-        ...formData,
+      // Construction de l'objet course à enregistrer
+      const courseData: any = {
+        title: formData.title,
+        description: formData.description,
+        categoryId: formData.categoryId,
+        level: formData.level,
+        duration: Number(formData.duration),
+        instructor: {
+          name: formData.instructorName,
+          title: formData.instructorTitle,
+          bio: formData.instructorBio,
+          // photoUrl: à gérer si upload
+        },
         chapters,
-        videoFile,
-        photoFile
-      });
+        assignedTo: course?.assignedTo || [],
+        createdAt: course?.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      // TODO: gérer l'upload de videoFile et photoFile si besoin
 
+      if (course && course.id) {
+        // Mise à jour
+        await updateDoc(doc(db, 'courses', course.id), courseData);
+      } else {
+        // Création
+        await addDoc(collection(db, 'courses'), courseData);
+      }
       onSave();
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
