@@ -3,28 +3,11 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { BadgeCheck, Calendar, User, Clock, X } from 'lucide-react';
 
-const COURSE_CATEGORIES = [
-  'Justice transitionnelle',
-  'Droits humains',
-  'Droit international humanitaire',
-  'Finances & Comptabilité',
-  'Droit',
-  'Management',
-  'Gouvernance',
-  'Économie',
-  'Informatique',
-  'Cours linguistiques',
-  'Statistiques',
-  'Politique',
-  'Médecine',
-];
-
 interface Course {
   id: string;
   title: string;
   description?: string;
-  category: string;
-  subcategory?: string;
+  categoryId: string;
   assignedTo: string[];
   duration?: number;
   level?: string;
@@ -43,6 +26,7 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
   const [error, setError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     const fetchAssignedCourses = async () => {
@@ -83,8 +67,17 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
     fetchAssignedCourses();
   }, [companyId]);
 
+  useEffect(() => {
+    // Charger les catégories Firestore
+    const fetchCategories = async () => {
+      const catSnap = await getDocs(collection(db, 'categories'));
+      setCategories(catSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    };
+    fetchCategories();
+  }, []);
+
   const filteredCourses = categoryFilter
-    ? courses.filter((course) => course.category === categoryFilter)
+    ? courses.filter((course) => course.categoryId === categoryFilter)
     : courses;
 
   const formatDate = (timestamp: any) => {
@@ -101,23 +94,9 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
     }
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors = {
-      'Justice transitionnelle': 'bg-purple-100 text-purple-700',
-      'Droits humains': 'bg-blue-100 text-blue-700',
-      'Droit international humanitaire': 'bg-red-100 text-red-700',
-      'Finances & Comptabilité': 'bg-green-100 text-green-700',
-      'Droit': 'bg-indigo-100 text-indigo-700',
-      'Management': 'bg-orange-100 text-orange-700',
-      'Gouvernance': 'bg-yellow-100 text-yellow-700',
-      'Économie': 'bg-teal-100 text-teal-700',
-      'Informatique': 'bg-cyan-100 text-cyan-700',
-      'Cours linguistiques': 'bg-pink-100 text-pink-700',
-      'Statistiques': 'bg-gray-100 text-gray-700',
-      'Politique': 'bg-rose-100 text-rose-700',
-      'Médecine': 'bg-emerald-100 text-emerald-700',
-    };
-    return colors[category as keyof typeof colors] || 'bg-blue-100 text-blue-700';
+  const getCategoryName = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    return cat ? cat.name : categoryId;
   };
 
   // Fermeture de la modale avec Échap
@@ -139,7 +118,7 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
     } else {
       document.body.style.overflow = 'unset';
     }
-    
+
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -147,7 +126,7 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
 
   // ----------- Modale d'affichage du détail d'un cours -----------
   const CourseDetailsModal = ({ course, onClose }: { course: Course, onClose: () => void }) => (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -158,8 +137,8 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
             <div className="flex-1">
               <h3 className="text-2xl font-bold text-gray-900 mb-2">{course.title}</h3>
               <div className="flex flex-wrap gap-2">
-                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(course.category)}`}>
-                  {course.category}
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700`}>
+                  {getCategoryName(course.categoryId)}
                 </span>
                 {course.subcategory && (
                   <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
@@ -232,7 +211,7 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
                 <div className="text-sm text-gray-600 space-y-2">
                   <div className="flex justify-between">
                     <span>Catégorie :</span>
-                    <span className="font-medium">{course.category}</span>
+                    <span className="font-medium">{getCategoryName(course.categoryId)}</span>
                   </div>
                   {course.subcategory && (
                     <div className="flex justify-between">
@@ -334,9 +313,9 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
           onChange={(e) => setCategoryFilter(e.target.value || null)}
         >
           <option value="">Toutes les catégories</option>
-          {COURSE_CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
             </option>
           ))}
         </select>
@@ -365,8 +344,8 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({ company
                   {course.title}
                 </h3>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(course.category)}`}>
-                    {course.category}
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700`}>
+                    {getCategoryName(course.categoryId)}
                   </span>
                   {course.subcategory && (
                     <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700">

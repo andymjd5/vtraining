@@ -5,7 +5,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 const courseData = {
   title: "Découverte de la bureautique",
   description: "Apprenez à maîtriser les outils de bureautique essentiels.",
-  category: "informatique",
+  categoryId: "informatique", // Remplacer par l'ID de la catégorie
   level: "débutant",
   duration: 6,
   assignedTo: ["5nwpaINX8si53ZCK190Z"],

@@ -60,7 +60,7 @@ service cloud.firestore {
     
     // Courses collection
     match /courses/{courseId} {
-      allow read: if isAuthenticated();
+      //allow read: if isAuthenticated();
       
       allow create, update, delete: if isSuperAdmin();
       

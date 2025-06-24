@@ -11,8 +11,7 @@ interface Course {
   id: string;
   title: string;
   description: string;
-  category: string;
-  subcategory?: string;
+  categoryId: string;
   level: string;
   duration: number;
   videoUrl?: string;
@@ -20,20 +19,11 @@ interface Course {
   createdAt: any;
 }
 
-interface Company {
-  id: string;
-  name: string;
-  email: string;
-  employeesCount: number;
-  industry: string;
-  logoUrl?: string;
-  createdAt: any;
-}
-
 const CourseManagement: React.FC = () => {
   const { success, error: showError } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -43,12 +33,11 @@ const CourseManagement: React.FC = () => {
 
   // States for filters
   const [filterCategory, setFilterCategory] = useState<string>('');
-  const [filterSubcategory, setFilterSubcategory] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     const q = query(collection(db, 'courses'), orderBy('createdAt', 'desc'));
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const coursesData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -61,58 +50,41 @@ const CourseManagement: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Load companies
+  // Charger les catégories Firestore
   useEffect(() => {
-    const loadCompanies = async () => {
-      try {
-        const companiesQuery = query(
-          collection(db, 'companies'),
-          orderBy('name', 'asc')
-        );
-        const companiesSnapshot = await getDocs(companiesQuery);
-        const companiesData = companiesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Company[];
-        setCompanies(companiesData);
-      } catch (error) {
-        console.error('Error loading companies:', error);
-        showError('Erreur lors du chargement des entreprises');
-      }
+    const fetchCategories = async () => {
+      const catSnap = await getDocs(collection(db, 'categories'));
+      setCategories(catSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     };
-    loadCompanies();
+
+    const fetchCompanies = async () => {
+      const companiesSnap = await getDocs(collection(db, 'companies'));
+      setCompanies(companiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    };
+    fetchCategories();
+    fetchCompanies();
   }, []);
 
-  // Calculate available categories and subcategories
+  // Adapter les filtres pour utiliser categoryId
   const availableCategories = useMemo(() => {
-    const categories = Array.from(new Set(courses.map(course => course.category).filter(Boolean)));
-    return categories.sort();
-  }, [courses]);
-
-  const availableSubcategories = useMemo(() => {
-    const subcategories = Array.from(new Set(
-      courses
-        .filter(course => !filterCategory || course.category === filterCategory)
-        .map(course => course.subcategory)
-        .filter(Boolean)
-    ));
-    return subcategories.sort();
-  }, [courses, filterCategory]);
+    const ids = Array.from(new Set(courses.map(course => course.categoryId).filter(Boolean)));
+    return ids.map(id => {
+      const cat = categories.find(c => c.id === id);
+      return cat ? cat : { id, name: id };
+    });
+  }, [courses, categories]);
 
   // Filter courses
   const filteredCourses = useMemo(() => {
     return courses.filter(course => {
-      const matchesCategory = !filterCategory || course.category === filterCategory;
-      const matchesSubcategory = !filterSubcategory || course.subcategory === filterSubcategory;
-      const matchesSearch = !searchTerm || 
+      const matchesCategory = !filterCategory || course.categoryId === filterCategory;
+      const matchesSearch = !searchTerm ||
         course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (course.subcategory && course.subcategory.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      return matchesCategory && matchesSubcategory && matchesSearch;
+        (categories.find(c => c.id === course.categoryId)?.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesCategory && matchesSearch;
     });
-  }, [courses, filterCategory, filterSubcategory, searchTerm]);
+  }, [courses, filterCategory, searchTerm, categories]);
 
   const handleAddCourse = () => {
     setSelectedCourse(null);
@@ -143,7 +115,7 @@ const CourseManagement: React.FC = () => {
   };
 
   const toggleCompanySelection = (companyId: string) => {
-    setSelectedCompanies(prev => 
+    setSelectedCompanies(prev =>
       prev.includes(companyId)
         ? prev.filter(id => id !== companyId)
         : [...prev, companyId]
@@ -167,6 +139,12 @@ const CourseManagement: React.FC = () => {
     } finally {
       setAssigning(false);
     }
+  };
+
+  // Utilitaire pour obtenir le nom de la catégorie
+  const getCategoryName = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    return cat ? cat.name : categoryId;
   };
 
   const getCompanyName = (companyId: string) => {
@@ -205,11 +183,11 @@ const CourseManagement: React.FC = () => {
       'anglais': 'bg-orange-100 text-orange-800',
       'default': 'bg-gray-100 text-gray-800'
     };
-    return colors[category.toLowerCase()] || colors.default;
+    return colors[category?.toLowerCase()] || colors.default;
   };
 
   const getCategoryIcon = (category: string) => {
-    switch (category.toLowerCase()) {
+    switch (category?.toLowerCase()) {
       case 'informatique':
         return '💻';
       case 'droits humains':
@@ -227,7 +205,6 @@ const CourseManagement: React.FC = () => {
 
   const clearFilters = () => {
     setFilterCategory('');
-    setFilterSubcategory('');
     setSearchTerm('');
   };
 
@@ -264,7 +241,7 @@ const CourseManagement: React.FC = () => {
           <div className="flex items-center gap-2 mb-4">
             <Filter className="h-5 w-5 text-gray-500" />
             <h3 className="text-lg font-semibold text-gray-900">Filtres</h3>
-            {(filterCategory || filterSubcategory || searchTerm) && (
+            {(filterCategory || searchTerm) && (
               <button
                 onClick={clearFilters}
                 className="ml-auto text-sm text-red-600 hover:text-red-800 underline"
@@ -273,7 +250,7 @@ const CourseManagement: React.FC = () => {
               </button>
             )}
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Search */}
             <div className="relative">
@@ -290,38 +267,20 @@ const CourseManagement: React.FC = () => {
             {/* Category filter */}
             <select
               value={filterCategory}
-              onChange={(e) => {
-                setFilterCategory(e.target.value);
-                setFilterSubcategory(''); // Reset subcategory when category changes
-              }}
+              onChange={(e) => setFilterCategory(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
             >
               <option value="">Toutes les catégories</option>
               {availableCategories.map(category => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-
-            {/* Subcategory filter */}
-            <select
-              value={filterSubcategory}
-              onChange={(e) => setFilterSubcategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              disabled={!filterCategory || availableSubcategories.length === 0}
-            >
-              <option value="">Toutes les sous-catégories</option>
-              {availableSubcategories.map(subcategory => (
-                <option key={subcategory} value={subcategory}>
-                  {subcategory}
+                <option key={category.id} value={category.id}>
+                  {category.name}
                 </option>
               ))}
             </select>
           </div>
 
           {/* Active filter indicators */}
-          {(filterCategory || filterSubcategory || searchTerm) && (
+          {(filterCategory || searchTerm) && (
             <div className="flex flex-wrap gap-2 mt-4">
               {searchTerm && (
                 <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
@@ -336,24 +295,10 @@ const CourseManagement: React.FC = () => {
               )}
               {filterCategory && (
                 <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-                  Catégorie: {filterCategory}
+                  Catégorie: {getCategoryName(filterCategory)}
                   <button
-                    onClick={() => {
-                      setFilterCategory('');
-                      setFilterSubcategory('');
-                    }}
+                    onClick={() => setFilterCategory('')}
                     className="hover:bg-blue-200 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {filterSubcategory && (
-                <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
-                  Sous-catégorie: {filterSubcategory}
-                  <button
-                    onClick={() => setFilterSubcategory('')}
-                    className="hover:bg-purple-200 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -396,7 +341,7 @@ const CourseManagement: React.FC = () => {
               {courses.length === 0 ? 'Aucun cours disponible' : 'Aucun cours ne correspond aux filtres'}
             </h3>
             <p className="text-gray-600 mb-6">
-              {courses.length === 0 
+              {courses.length === 0
                 ? 'Commencez par créer votre premier cours de formation'
                 : 'Essayez de modifier ou supprimer vos filtres'
               }
@@ -430,7 +375,7 @@ const CourseManagement: React.FC = () => {
               <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 text-white">
                 <div className="flex items-start justify-between mb-4">
                   <div className="text-4xl">
-                    {getCategoryIcon(course.category)}
+                    {getCategoryIcon(getCategoryName(course.categoryId))}
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getLevelColor(course.level)} bg-white/20 text-white`}>
                     {course.level}
@@ -439,17 +384,12 @@ const CourseManagement: React.FC = () => {
                 <h3 className="text-xl font-bold mb-2 line-clamp-2">
                   {course.title}
                 </h3>
-                
+
                 {/* Category and subcategory */}
                 <div className="flex flex-wrap gap-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(course.category)} bg-white/90`}>
-                    {course.category}
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(getCategoryName(course.categoryId))} bg-white/90`}>
+                    {getCategoryName(course.categoryId)}
                   </span>
-                  {course.subcategory && (
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white border border-white/30">
-                      {course.subcategory}
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -590,9 +530,8 @@ const CourseManagement: React.FC = () => {
                 {companies.map(company => (
                   <div
                     key={company.id}
-                    className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${
-                      selectedCompanies.includes(company.id) ? 'bg-blue-50 border-blue-200' : ''
-                    }`}
+                    className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${selectedCompanies.includes(company.id) ? 'bg-blue-50 border-blue-200' : ''
+                      }`}
                     onClick={() => toggleCompanySelection(company.id)}
                   >
                     <div className="flex items-center justify-between">
@@ -609,12 +548,11 @@ const CourseManagement: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                        selectedCompanies.includes(company.id)
-                          ? 'bg-green-500 border-green-500 text-white'
-                          : 'border-gray-300'
-                      }`}>
+
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${selectedCompanies.includes(company.id)
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : 'border-gray-300'
+                        }`}>
                         {selectedCompanies.includes(company.id) && (
                           <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

@@ -11,7 +11,7 @@ interface Course {
   id: string;
   title: string;
   description: string;
-  category: string;
+  categoryId: string;
   level: string;
   duration: number;
   instructor: {
@@ -55,6 +55,7 @@ const AssignedCourses = () => {
   const [unassigning, setUnassigning] = useState(false);
   const [assignSearchTerm, setAssignSearchTerm] = useState('');
   const [unassignSearchTerm, setUnassignSearchTerm] = useState('');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     if (user?.companyId) {
@@ -62,6 +63,15 @@ const AssignedCourses = () => {
       fetchStudents();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Charger les catégories Firestore
+    const fetchCategories = async () => {
+      const catSnap = await getDocs(collection(db, 'categories'));
+      setCategories(catSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    };
+    fetchCategories();
+  }, []);
 
   const fetchAssignedCourses = async () => {
     try {
@@ -117,10 +127,10 @@ const AssignedCourses = () => {
 
       // Get student details for enrolled students
       const enrolledStudentIds = enrollments.map(e => e.userId);
-      const enrolledStudentsData = students.filter(student => 
+      const enrolledStudentsData = students.filter(student =>
         enrolledStudentIds.includes(student.id)
       );
-      
+
       setEnrolledStudents(enrolledStudentsData);
     } catch (error) {
       console.error('Error fetching enrolled students:', error);
@@ -213,7 +223,7 @@ const AssignedCourses = () => {
           where('companyId', '==', user!.companyId!)
         );
         const enrollmentSnapshot = await getDocs(enrollmentQuery);
-        
+
         enrollmentSnapshot.docs.forEach(async (enrollmentDoc) => {
           await deleteDoc(doc(db, 'enrollments', enrollmentDoc.id));
         });

@@ -47,8 +47,7 @@ export interface Course {
   id: string;
   title: string;
   description: string;
-  category: string;
-  subcategory?: string;
+  categoryId: string; // Normalisé : référence à la catégorie
   level: string;
   duration: number;
   instructor: {
