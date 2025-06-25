@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  X, Upload, Save, FileVideo, User, BookOpen, Settings,
-  Plus, ChevronRight, ChevronDown, Move, Image as ImageIcon,
+  X, Save, FileVideo, User, BookOpen, Settings,
+  Plus, ChevronRight, ChevronDown, GripVertical, Type,
   Bold, Italic, List, AlignLeft, AlignCenter, AlignRight,
-  Trash2, GripVertical, Type
+  Trash2, Image as ImageIcon
 } from 'lucide-react';
-import { collection, getDocs, addDoc, setDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { uploadCourseIntroVideo } from '../../lib/uploadCourseIntroVideo';
 
 // Types pour la structure du contenu
 interface MediaItem {
@@ -49,8 +50,7 @@ interface Course {
   id: string;
   title: string;
   description: string;
-  category: string;
-  subcategory?: string; // Nouveau champ optionnel
+  categoryId: string;
   level: string;
   duration: number;
   videoUrl?: string;
@@ -115,6 +115,11 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
 
   const levels = ['Débutant', 'Intermédiaire', 'Avancé'];
 
+  // États pour la progression et l'URL de la vidéo
+  const [videoUploadProgress, setVideoUploadProgress] = useState<number | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string>(course?.videoUrl || '');
+  const [videoUploadError, setVideoUploadError] = useState<string | null>(null);
+
   // Génération d'ID unique
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -175,9 +180,20 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   };
 
   // Gestion des uploads de fichiers
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setVideoFile(file);
+    if (!file) return;
+    setVideoFile(file);
+    setVideoUploadProgress(0);
+    setVideoUploadError(null);
+    try {
+      const result = await uploadCourseIntroVideo(file, (progress) => setVideoUploadProgress(progress));
+      setVideoUrl(result.url);
+      setVideoUploadProgress(null);
+    } catch (err: any) {
+      setVideoUploadError('Erreur lors de l\'upload de la vidéo.');
+      setVideoUploadProgress(null);
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,7 +202,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   };
 
   // Simulation d'upload de média pour le contenu (remplacez par votre logique Firebase)
-  const uploadMedia = async (file: File, type: 'image' | 'video'): Promise<string> => {
+  const uploadMedia = async (file: File): Promise<string> => {
     // Simulation d'upload - remplacez par votre logique Firebase
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -304,26 +320,6 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
     ));
   };
 
-  const updateBlockFormatting = (chapterId: string, sectionId: string, blockId: string, formatting: any) => {
-    setChapters(chapters.map(ch =>
-      ch.id === chapterId
-        ? {
-          ...ch,
-          sections: ch.sections.map(sec =>
-            sec.id === sectionId
-              ? {
-                ...sec,
-                content: sec.content.map(block =>
-                  block.id === blockId ? { ...block, formatting: { ...block.formatting, ...formatting } } : block
-                )
-              }
-              : sec
-          )
-        }
-        : ch
-    ));
-  };
-
   const addContentBlock = (chapterId: string, sectionId: string, type: 'text' | 'media') => {
     const newBlock: ContentBlock = {
       id: generateId(),
@@ -354,7 +350,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   // Ajout de média dans une section
   const addMediaToSection = async (chapterId: string, sectionId: string, file: File, type: 'image' | 'video') => {
     try {
-      const url = await uploadMedia(file, type);
+      const url = await uploadMedia(file);
       const mediaItem: MediaItem = {
         id: generateId(),
         type,
@@ -438,8 +434,13 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploading(true);
-
     try {
+      let finalVideoUrl = videoUrl;
+      // If a new video file is selected and not yet uploaded
+      if (videoFile && !videoUrl) {
+        const result = await uploadCourseIntroVideo(videoFile, (progress) => setVideoUploadProgress(progress));
+        finalVideoUrl = result.url;
+      }
       // Construction de l'objet course à enregistrer
       const courseData: any = {
         title: formData.title,
@@ -451,12 +452,12 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
           name: formData.instructorName,
           title: formData.instructorTitle,
           bio: formData.instructorBio,
-          // photoUrl: à gérer si upload
         },
         chapters,
         assignedTo: course?.assignedTo || [],
         createdAt: course?.createdAt || serverTimestamp(),
         updatedAt: serverTimestamp(),
+        videoUrl: finalVideoUrl,
       };
       // TODO: gérer l'upload de videoFile et photoFile si besoin
 
@@ -593,11 +594,32 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
         >
           <div className="text-6xl text-gray-400 mb-4">🎬</div>
           <div className="text-lg font-medium text-gray-700 mb-2">
-            {videoFile ? videoFile.name : 'Cliquez pour uploader la vidéo'}
+            {videoFile ? videoFile.name : videoUrl ? 'Vidéo déjà uploadée' : 'Cliquez pour uploader la vidéo'}
           </div>
           <div className="text-sm text-gray-500">
             MP4, MOV, AVI - Max 500MB
           </div>
+          {videoUploadProgress !== null && (
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div className="bg-red-500 h-2.5 rounded-full" style={{ width: `${videoUploadProgress}%` }}></div>
+              </div>
+              <div className="text-xs text-gray-600 mt-1">{Math.round(videoUploadProgress)}%</div>
+            </div>
+          )}
+          {videoUploadError && (
+            <div className="text-xs text-red-500 mt-2">{videoUploadError}</div>
+          )}
+          {(videoUrl && !videoFile) && (
+            <div className="mt-4">
+              <video src={videoUrl} controls className="w-full max-h-48 rounded-lg shadow" />
+            </div>
+          )}
+          {videoFile && (
+            <div className="mt-4">
+              <video src={URL.createObjectURL(videoFile)} controls className="w-full max-h-48 rounded-lg shadow" />
+            </div>
+          )}
         </div>
         <input
           type="file"
@@ -605,6 +627,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
           accept="video/*"
           onChange={handleVideoUpload}
           className="hidden"
+          disabled={uploading || videoUploadProgress !== null}
         />
       </div>
 
@@ -906,7 +929,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
               {/* Contenu de la section */}
               <div className="flex-1 p-4 overflow-y-auto">
                 <div className="space-y-4">
-                  {activeSectionData.content.map((block, index) => (
+                  {activeSectionData.content.map((block) => (
                     <div
                       key={block.id}
                       className="group relative border border-transparent hover:border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors"
@@ -979,8 +1002,6 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                                 type="button"
                                 onClick={() => {
                                   if (block.media) {
-                                    const updatedMedia = { ...block.media, alignment: 'left' as const };
-                                    updateSectionContent(activeChapter!, activeSection!, block.id, '');
                                     // Mise à jour du média - vous devrez adapter selon votre structure
                                   }
                                 }}
@@ -992,7 +1013,6 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                                 type="button"
                                 onClick={() => {
                                   if (block.media) {
-                                    const updatedMedia = { ...block.media, alignment: 'center' as const };
                                     // Mise à jour du média
                                   }
                                 }}
@@ -1004,7 +1024,6 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                                 type="button"
                                 onClick={() => {
                                   if (block.media) {
-                                    const updatedMedia = { ...block.media, alignment: 'right' as const };
                                     // Mise à jour du média
                                   }
                                 }}
@@ -1108,7 +1127,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
     // Charger dynamiquement les catégories Firestore
     const fetchCategories = async () => {
       const catSnap = await getDocs(collection(db, 'categories'));
-      setCategories(catSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCategories(catSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     };
     fetchCategories();
   }, []);
