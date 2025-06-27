@@ -47,7 +47,7 @@ const SuperAdminSettings = () => {
     setSettings(prev => ({
       ...prev,
       [section]: {
-        ...prev[section],
+        ...prev[section as keyof typeof prev],
         [key]: value
       }
     }));

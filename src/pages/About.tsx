@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import Button from '../components/ui/Button';
 
 const About = () => {
   return (
@@ -47,6 +49,15 @@ const About = () => {
               Ready to transform your organization's learning experience? Contact us 
               to learn more about how we can help you achieve your training goals.
             </p>
+            <Link to="/login">
+              <Button 
+                size="lg" 
+                variant="primary"
+                className="mt-2"
+              >
+                Sign in now
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
