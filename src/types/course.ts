@@ -1,0 +1,221 @@
+// src/types/course.ts
+// Types définissant la nouvelle structure de données pour les cours
+// Ces types remplacent et étendent les types existants dans index.ts
+
+// Types de base pour les documents Firestore
+
+/**
+ * Document principal du cours - Collection 'courses'
+ */
+export interface Course {
+    id: string;
+    title: string;
+    description: string;
+    categoryId: string;
+    level: string;
+    duration: number;
+    videoUrl?: string;
+    videoThumbnailUrl?: string;  // Nouvelle propriété: miniature de la vidéo
+    assignedTo: string[];
+    status: 'draft' | 'published';
+    tags?: string[];              // Nouveau: tags pour la recherche
+    createdAt: any;
+    updatedAt: any;
+    instructorId?: string;        // Référence à un profil d'instructeur distinct
+    chaptersOrder: string[];      // Ordre des chapitres
+    currentVersion?: number;      // Numéro de version actuel
+}
+
+/**
+ * Document instructeur - Collection 'instructors'
+ */
+export interface Instructor {
+    id: string;
+    name: string;
+    title: string;
+    bio: string;
+    photoUrl?: string;
+    email?: string;
+    expertise?: string[];
+    socialLinks?: {
+        linkedIn?: string;
+        twitter?: string;
+        website?: string;
+    };
+    courses?: string[];          // IDs des cours associés
+    createdAt: any;
+    updatedAt: any;
+}
+
+/**
+ * Document chapitre - Collection 'chapters'
+ */
+export interface Chapter {
+    id: string;
+    courseId: string;
+    title: string;
+    description?: string;
+    order: number;
+    estimatedTime?: number;        // Temps estimé en minutes
+    learningObjectives?: string[]; // Nouveaux objectifs d'apprentissage
+    sectionsOrder: string[];       // Ordre des sections
+    hasQuiz?: boolean;
+    quizSettings?: QuizSettings;
+    createdAt: any;
+    updatedAt: any;
+}
+
+/**
+ * Document section - Collection 'sections'
+ */
+export interface Section {
+    id: string;
+    chapterId: string;
+    courseId: string;
+    title: string;
+    order: number;
+    contentBlocksOrder: string[];  // Ordre des blocs de contenu
+    createdAt: any;
+    updatedAt: any;
+}
+
+/**
+ * Document bloc de contenu - Collection 'content_blocks'
+ */
+export interface ContentBlock {
+    id: string;
+    sectionId: string;
+    chapterId: string;
+    courseId: string;
+    type: 'text' | 'image' | 'video' | 'file' | 'code' | 'embed';
+    content: string;
+    order: number;
+    formatting?: TextFormatting;
+    media?: MediaItem;
+    createdAt: any;
+    updatedAt: any;
+}
+
+/**
+ * Options de formatage du texte
+ */
+export interface TextFormatting {
+    bold?: boolean;
+    italic?: boolean;
+    list?: boolean;
+    alignment?: 'left' | 'center' | 'right';
+}
+
+/**
+ * Item média (image ou vidéo)
+ */
+export interface MediaItem {
+    id: string;
+    type: 'image' | 'video';
+    url: string;
+    alignment?: 'left' | 'center' | 'right';
+    caption?: string;
+    thumbnailUrl?: string;        // URL de miniature pour les vidéos
+}
+
+/**
+ * Paramètres de quiz
+ */
+export interface QuizSettings {
+    passingScore: number;
+    timeLimit: number;
+    questionCount: number;
+    isRandomized: boolean;
+    showFeedbackImmediately: boolean;
+    attemptsAllowed: number;
+}
+
+/**
+ * Question de quiz - Collection 'quiz_questions'
+ */
+export interface QuizQuestion {
+    id: string;
+    chapterId: string;
+    courseId: string;
+    question: string;
+    options: string[];
+    answer: number;  // Index de la bonne réponse
+    explanation?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    createdAt: any;
+    updatedAt: any;
+}
+
+/**
+ * Tentative de quiz - Collection 'quiz_attempts'
+ */
+export interface QuizAttempt {
+    id: string;
+    userId: string;
+    chapterId: string;
+    courseId: string;
+    startedAt: any;
+    completedAt?: any;
+    timeSpent?: number;
+    score: number;
+    maxScore: number;
+    passed: boolean;
+    answers: {
+        questionId: string;
+        selectedAnswer: number;
+        correct: boolean;
+    }[];
+}
+
+/**
+ * Version de cours - Collection 'course_versions'
+ */
+export interface CourseVersion {
+    id: string;
+    courseId: string;
+    versionNumber: number;
+    createdAt: any;
+    createdBy: string;
+    changes: {
+        field: string;
+        oldValue: any;
+        newValue: any;
+    }[];
+    snapshot: any; // Instantané du cours à ce moment
+}
+
+// Types composites pour l'interface utilisateur
+
+/**
+ * Course avec sa structure complète (pour l'UI)
+ */
+export interface CourseWithStructure extends Course {
+    chapters?: ChapterWithSections[];
+    instructor?: Instructor;
+}
+
+/**
+ * Chapitre avec ses sections (pour l'UI)
+ */
+export interface ChapterWithSections extends Chapter {
+    sections: SectionWithContent[];
+    expanded?: boolean; // Pour l'UI seulement
+}
+
+/**
+ * Section avec ses blocs de contenu (pour l'UI)
+ */
+export interface SectionWithContent extends Section {
+    content: ContentBlock[];
+}
+
+/**
+ * Type décrivant la migration d'un cours depuis l'ancien format
+ */
+export interface CourseMigrationResult {
+    course: Course;
+    instructor: Instructor;
+    chapters: Chapter[];
+    sections: Section[];
+    contentBlocks: ContentBlock[];
+}

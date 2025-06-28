@@ -16,9 +16,11 @@ A multi-tenant e-learning platform built with React, Firebase, and TypeScript.
 
 - `companies`: Organization profiles
 - `users`: User accounts with role-based access
-- `courses`: Training content containers
-- `modules`: Course subdivisions
-- `lessons`: Individual learning units
+- `courses`: Course metadata and properties
+- `chapters`: Course subdivisions (previously nested inside courses)
+- `sections`: Chapter subdivisions
+- `content_blocks`: Individual content units within sections
+- `instructors`: Course instructor profiles
 
 #### Progress Tracking
 
@@ -219,6 +221,47 @@ Required variables for production:
 - Certificate generation
 - File management with Firebase Storage
 - Activity logging
+
+## 📋 Data Migration Scripts
+
+Documentation complète sur la migration : [Phase 4 - Migration des données](/docs/phase4-migration.md)
+
+### Course Structure Migration
+
+The platform has migrated from a nested document structure to a more modular, normalized data model. Several scripts have been created to facilitate this transition:
+
+#### Migration Scripts
+
+- `scripts/migrateCourses.mjs`: Migrates courses from the old nested structure to the new modular collections
+- `scripts/validateMigration.mjs`: Validates the integrity of migrated data
+- `scripts/identifyObsoleteScripts.mjs`: Identifies scripts that are no longer compatible with the new structure
+- `scripts/markObsoleteScripts.mjs`: Marks obsolete scripts with `.obsolete` extension
+
+#### Updated Scripts
+
+- `src/scripts/createProgressTrackingV2.js`: Updated version of progress tracking script compatible with the new data structure
+
+#### Running Migration
+
+1. Migrate courses to new structure:
+   ```bash
+   node scripts/migrateCourses.mjs
+   ```
+
+2. Validate migrated data:
+   ```bash
+   node scripts/validateMigration.mjs
+   ```
+
+3. Identify obsolete scripts:
+   ```bash
+   node scripts/identifyObsoleteScripts.mjs
+   ```
+
+4. Mark obsolete scripts:
+   ```bash
+   node scripts/markObsoleteScripts.mjs
+   ```
 - Real-time notifications
 - Offline support (PWA ready)
 
