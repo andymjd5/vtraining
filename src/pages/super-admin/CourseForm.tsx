@@ -20,6 +20,7 @@ interface CourseFormData {
   categoryId: string;
   level: string;
   duration: number;
+  status: 'draft' | 'published';  // État du cours
   instructorId?: string;  // Référence à un profil d'instructeur existant
   instructorName: string;
   instructorTitle: string;
@@ -36,7 +37,6 @@ interface CourseFormProps {
 const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   // Liste des catégories
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-
   // États pour les informations de base du cours
   const [formData, setFormData] = useState<CourseFormData>({
     title: course?.title || '',
@@ -44,11 +44,12 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
     categoryId: course?.categoryId || (categories[0]?.id || ''),
     level: course?.level || 'Débutant',
     duration: course?.duration || 0,
+    status: course?.status || 'draft',
     instructorId: course?.instructorId,
     instructorName: '',
     instructorTitle: '',
     instructorBio: '',
-  });  // États pour les fichiers
+  });// États pour les fichiers
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -218,9 +219,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
         } else {
           instructorId = await instructorService.saveInstructor(instructorData, true);
         }
-      }
-
-      // Préparation des données du cours
+      }      // Préparation des données du cours
       const courseData: Partial<Course> = {
         id: course?.id,
         title: formData.title,
@@ -230,7 +229,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
         duration: formData.duration,
         videoUrl,
         instructorId,
-        status: course?.status || 'draft',
+        status: formData.status,
         assignedTo: course?.assignedTo || [],
         chaptersOrder: chapters.map(ch => ch.id)
       };
@@ -478,9 +477,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                 )}
               </div>
             )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+          </div>          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Niveau
@@ -511,6 +508,75 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
               />
             </div>
+          </div>
+
+          {/* Statut du cours */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Statut du cours
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="draft"
+                  checked={formData.status === 'draft'}
+                  onChange={handleInputChange}
+                  className="sr-only"
+                />
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${formData.status === 'draft'
+                    ? 'border-yellow-500 bg-yellow-50 text-yellow-800'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}>
+                  <div className={`w-3 h-3 rounded-full ${formData.status === 'draft' ? 'bg-yellow-500' : 'bg-gray-300'
+                    }`}></div>
+                  <div>
+                    <div className="font-medium">Brouillon</div>
+                    <div className="text-xs opacity-75">Cours en cours de création</div>
+                  </div>
+                </div>
+              </label>
+
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="published"
+                  checked={formData.status === 'published'}
+                  onChange={handleInputChange}
+                  className="sr-only"
+                />
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${formData.status === 'published'
+                    ? 'border-green-500 bg-green-50 text-green-800'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}>
+                  <div className={`w-3 h-3 rounded-full ${formData.status === 'published' ? 'bg-green-500' : 'bg-gray-300'
+                    }`}></div>
+                  <div>
+                    <div className="font-medium">Publié</div>
+                    <div className="text-xs opacity-75">Disponible pour les étudiants</div>
+                  </div>
+                </div>
+              </label>
+            </div>            <p className="text-xs text-gray-500 mt-2">
+              {formData.status === 'draft'
+                ? '📝 Le cours n\'est pas visible par les étudiants et peut être modifié librement'
+                : '✅ Le cours est visible et accessible aux étudiants assignés'
+              }
+            </p>
+
+            {formData.status === 'published' && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <div className="text-blue-500 mt-0.5">ℹ️</div>
+                  <div className="text-xs text-blue-700">
+                    <div className="font-medium mb-1">Cours publié</div>
+                    <div>Une fois publié, le cours sera immédiatement disponible pour tous les étudiants des entreprises assignées. Assurez-vous que le contenu est complet et vérifié.</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -794,12 +860,21 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50 overflow-y-auto p-4">
       <div className="bg-white rounded-xl w-full max-w-7xl max-h-[90vh] overflow-auto shadow-xl">
-        <div className="flex flex-col h-full">
-          {/* Header */}
+        <div className="flex flex-col h-full">          {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 p-4">
-            <h2 className="text-2xl font-semibold text-gray-900">
-              {course ? 'Modifier le cours' : 'Créer un nouveau cours'}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-semibold text-gray-900">
+                {course ? 'Modifier le cours' : 'Créer un nouveau cours'}
+              </h2>
+              {course && (
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${formData.status === 'published'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                  {formData.status === 'published' ? '✅ Publié' : '📝 Brouillon'}
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={onClose}
@@ -834,9 +909,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-            {currentView === 'basic' ? renderBasicForm() : renderContentEditor()}
-
-            <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-200">
+            {currentView === 'basic' ? renderBasicForm() : renderContentEditor()}            <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
@@ -846,7 +919,10 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
               </button>
               <button
                 type="submit"
-                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2"
+                className={`px-6 py-3 text-white rounded-lg transition-colors flex items-center gap-2 ${formData.status === 'published'
+                    ? 'bg-green-500 hover:bg-green-600'
+                    : 'bg-red-500 hover:bg-red-600'
+                  }`}
                 disabled={uploading}
               >
                 {uploading ? (
@@ -857,7 +933,9 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                 ) : (
                   <>
                     <Save className="h-5 w-5" />
-                    <span>Enregistrer</span>
+                    <span>
+                      {formData.status === 'published' ? 'Publier le cours' : 'Enregistrer en brouillon'}
+                    </span>
                   </>
                 )}
               </button>
