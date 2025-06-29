@@ -526,8 +526,8 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                   className="sr-only"
                 />
                 <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${formData.status === 'draft'
-                    ? 'border-yellow-500 bg-yellow-50 text-yellow-800'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  ? 'border-yellow-500 bg-yellow-50 text-yellow-800'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                   }`}>
                   <div className={`w-3 h-3 rounded-full ${formData.status === 'draft' ? 'bg-yellow-500' : 'bg-gray-300'
                     }`}></div>
@@ -548,8 +548,8 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
                   className="sr-only"
                 />
                 <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${formData.status === 'published'
-                    ? 'border-green-500 bg-green-50 text-green-800'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  ? 'border-green-500 bg-green-50 text-green-800'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                   }`}>
                   <div className={`w-3 h-3 rounded-full ${formData.status === 'published' ? 'bg-green-500' : 'bg-gray-300'
                     }`}></div>
@@ -864,12 +864,12 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
           <div className="flex items-center justify-between border-b border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-semibold text-gray-900">
-                {course ? 'Modifier le cours' : 'Créer un nouveau cours'}
+                {course ? 'Modifier le cours' : 'Créer un nouveau cours'}  {formData.title && <span className="text-gray-500"> - {formData.title}</span>}
               </h2>
               {course && (
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${formData.status === 'published'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-yellow-100 text-yellow-800'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-yellow-100 text-yellow-800'
                   }`}>
                   {formData.status === 'published' ? '✅ Publié' : '📝 Brouillon'}
                 </span>
@@ -920,8 +920,8 @@ const CourseForm: React.FC<CourseFormProps> = ({ course, onClose, onSave }) => {
               <button
                 type="submit"
                 className={`px-6 py-3 text-white rounded-lg transition-colors flex items-center gap-2 ${formData.status === 'published'
-                    ? 'bg-green-500 hover:bg-green-600'
-                    : 'bg-red-500 hover:bg-red-600'
+                  ? 'bg-green-500 hover:bg-green-600'
+                  : 'bg-red-500 hover:bg-red-600'
                   }`}
                 disabled={uploading}
               >

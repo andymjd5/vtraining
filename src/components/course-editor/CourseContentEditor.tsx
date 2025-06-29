@@ -30,11 +30,10 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
         id: string;
         sourceChapterId?: string;
         sourceSectionId?: string;
-    } | null>(null);
-
-    // Références pour les uploads de médias
+    } | null>(null);    // Références pour les uploads de médias
     const imageUploadRef = useRef<HTMLInputElement>(null);
     const videoUploadRef = useRef<HTMLInputElement>(null);
+    const audioUploadRef = useRef<HTMLInputElement>(null);
 
     // Fonctions de gestion des chapitres
     const handleAddChapter = () => {
@@ -283,23 +282,19 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
         }
 
         onChaptersChange(updatedChapters);
-    };
-
-    // Gestion des uploads de médias
-    const handleMediaUpload = async (file: File, type: 'image' | 'video') => {
+    };    // Gestion des uploads de médias
+    const handleMediaUpload = async (file: File, type: 'image' | 'video' | 'audio') => {
         if (!activeChapter || !activeSection || !file) return;
 
         try {
             // Upload du média via le service media
-            const result = await mediaService.uploadCourseMedia(
+            const result = await mediaService.uploadMedia(
                 file,
-                courseId,
-                activeChapter,
-                activeSection,
-                type
-            );
-
-            // Créer un nouveau bloc de contenu de type média
+                type,
+                (progress) => {
+                    console.log(`Upload progress: ${progress}%`);
+                }
+            );            // Créer un nouveau bloc de contenu de type média
             const newBlockId = `blk-${uuidv4()}`;
             const newBlock: ContentBlock = {
                 id: newBlockId,
@@ -314,6 +309,10 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
                     type,
                     url: result.url,
                     alignment: 'center',
+                    thumbnailUrl: result.thumbnailUrl,
+                    duration: result.duration,
+                    fileSize: result.fileSize,
+                    mimeType: result.mimeType,
                 },
                 createdAt: new Date(),
                 updatedAt: new Date()
@@ -355,11 +354,16 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
         if (file) handleMediaUpload(file, 'image');
         // Reset input
         if (e.target) e.target.value = '';
-    };
-
-    const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    }; const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) handleMediaUpload(file, 'video');
+        // Reset input
+        if (e.target) e.target.value = '';
+    };
+
+    const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) handleMediaUpload(file, 'audio');
         // Reset input
         if (e.target) e.target.value = '';
     };
@@ -699,15 +703,22 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
                                 >
                                     <Plus className="h-3.5 w-3.5" />
                                     Image
-                                </button>
-
-                                <button
+                                </button>                                <button
                                     type="button"
                                     onClick={() => videoUploadRef.current?.click()}
                                     className="px-3 py-1.5 border border-gray-300 hover:border-red-300 hover:bg-red-50 rounded-md text-sm flex items-center gap-1.5 transition-colors"
                                 >
                                     <Plus className="h-3.5 w-3.5" />
                                     Vidéo
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => audioUploadRef.current?.click()}
+                                    className="px-3 py-1.5 border border-gray-300 hover:border-red-300 hover:bg-red-50 rounded-md text-sm flex items-center gap-1.5 transition-colors"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Audio
                                 </button>
                             </div>
                         </div>
@@ -758,9 +769,7 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
                         </div>
                     </div>
                 )}
-            </div>
-
-            {/* Inputs cachés pour les uploads */}
+            </div>            {/* Inputs cachés pour les uploads */}
             <input
                 ref={imageUploadRef}
                 type="file"
@@ -773,6 +782,13 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
                 type="file"
                 accept="video/*"
                 onChange={handleVideoUpload}
+                className="hidden"
+            />
+            <input
+                ref={audioUploadRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleAudioUpload}
                 className="hidden"
             />
         </div>

@@ -24,6 +24,58 @@ import {
 } from '../types/course';
 
 /**
+ * Nettoie un objet en remplaçant les valeurs undefined par null
+ * Firestore ne supporte pas les valeurs undefined
+ */
+function cleanObjectForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(cleanObjectForFirestore);
+  }
+
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanObjectForFirestore(value);
+      }
+    }
+    return cleaned;
+  }
+
+  return obj;
+}
+
+/**
+ * Valide qu'un objet ne contient pas de valeurs undefined
+ * Utilisé pour le debugging
+ */
+function validateObjectForFirestore(obj: any, path = ''): string[] {
+  const errors: string[] = [];
+
+  if (obj === undefined) {
+    errors.push(`Valeur undefined trouvée à ${path || 'racine'}`);
+    return errors;
+  }
+
+  if (Array.isArray(obj)) {
+    obj.forEach((item, index) => {
+      errors.push(...validateObjectForFirestore(item, `${path}[${index}]`));
+    });
+  } else if (obj !== null && typeof obj === 'object') {
+    for (const [key, value] of Object.entries(obj)) {
+      const currentPath = path ? `${path}.${key}` : key;
+      errors.push(...validateObjectForFirestore(value, currentPath));
+    }
+  }
+
+  return errors;
+}
+
+/**
  * Service pour la gestion des cours avec la nouvelle structure optimisée
  */
 export const courseService = {
@@ -35,10 +87,8 @@ export const courseService = {
    */
   async saveCourse(courseData: Partial<Course>, isNew = true): Promise<string> {
     try {
-      const courseId = courseData.id || doc(collection(db, 'courses')).id;
-
-      // Préparation des données du cours
-      const courseToSave = {
+      const courseId = courseData.id || doc(collection(db, 'courses')).id;      // Préparation des données du cours
+      const courseToSave = cleanObjectForFirestore({
         ...courseData,
         id: courseId,
         updatedAt: serverTimestamp(),
@@ -46,7 +96,7 @@ export const courseService = {
         status: courseData.status || 'draft',
         assignedTo: courseData.assignedTo || [],
         chaptersOrder: courseData.chaptersOrder || []
-      };
+      });
 
       // Enregistrer le document du cours
       if (isNew) {
@@ -224,13 +274,12 @@ export const courseService = {
    * Met à jour les métadonnées d'un cours
    * @param courseId ID du cours
    * @param courseData Données à mettre à jour
-   */
-  async updateCourse(courseId: string, courseData: Partial<Course>): Promise<void> {
+   */  async updateCourse(courseId: string, courseData: Partial<Course>): Promise<void> {
     try {
-      await updateDoc(doc(db, 'courses', courseId), {
+      await updateDoc(doc(db, 'courses', courseId), cleanObjectForFirestore({
         ...courseData,
         updatedAt: serverTimestamp()
-      });
+      }));
     } catch (error) {
       console.error('Error updating course:', error);
       throw error;
@@ -297,13 +346,11 @@ export const courseService = {
       batch.update(doc(db, 'courses', courseId), {
         chaptersOrder,
         updatedAt: serverTimestamp()
-      });
-
-      // Sauvegarder chaque chapitre
+      });      // Sauvegarder chaque chapitre
       for (const chapter of chapters) {
         const chapterRef = doc(db, 'chapters', chapter.id);
 
-        batch.set(chapterRef, {
+        batch.set(chapterRef, cleanObjectForFirestore({
           id: chapter.id,
           courseId,
           title: chapter.title,
@@ -316,13 +363,11 @@ export const courseService = {
           sectionsOrder: chapter.sections.map(sec => sec.id),
           createdAt: chapter.createdAt || serverTimestamp(),
           updatedAt: serverTimestamp()
-        });
-
-        // Sauvegarder les sections de ce chapitre
+        }));        // Sauvegarder les sections de ce chapitre
         for (const section of chapter.sections) {
           const sectionRef = doc(db, 'sections', section.id);
 
-          batch.set(sectionRef, {
+          batch.set(sectionRef, cleanObjectForFirestore({
             id: section.id,
             chapterId: chapter.id,
             courseId,
@@ -331,26 +376,23 @@ export const courseService = {
             contentBlocksOrder: section.content?.map(block => block.id) || [],
             createdAt: section.createdAt || serverTimestamp(),
             updatedAt: serverTimestamp()
-          });
-
-          // Sauvegarder les blocs de contenu de cette section
+          }));// Sauvegarder les blocs de contenu de cette section
           if (section.content && section.content.length > 0) {
             for (const block of section.content) {
-              const blockRef = doc(db, 'content_blocks', block.id);
-
-              batch.set(blockRef, {
+              const blockRef = doc(db, 'content_blocks', block.id);              // Nettoyer l'objet media pour éviter les valeurs undefined
+              const cleanMedia = block.media ? cleanObjectForFirestore(block.media) : null; batch.set(blockRef, cleanObjectForFirestore({
                 id: block.id,
                 sectionId: section.id,
                 chapterId: chapter.id,
                 courseId,
                 type: block.type,
-                content: block.content,
+                content: block.content || '',
                 order: section.content.indexOf(block),
                 formatting: block.formatting || null,
-                media: block.media || null,
+                media: cleanMedia,
                 createdAt: block.createdAt || serverTimestamp(),
                 updatedAt: serverTimestamp()
-              });
+              }));
             }
           }
         }

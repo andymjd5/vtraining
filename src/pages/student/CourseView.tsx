@@ -10,21 +10,29 @@ import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/Avatar'
 import { Badge } from '../../components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
 
-import { 
-  CheckCircle, 
-  Clock, 
-  BookOpen, 
+import {
+  CheckCircle,
+  Clock,
+  BookOpen,
   ArrowLeft,
   PlayCircle,
   Users,
   Star,
   Award
 } from 'lucide-react';
+import ContentBlockViewer from '../../components/course-viewer/ContentBlockViewer';
+import { ContentBlock } from '../../types/course';
 
 const toast = {
   success: (message: string) => console.log('✅', message),
   error: (message: string) => console.error('❌', message)
 };
+
+interface Section {
+  id: string;
+  title: string;
+  content: ContentBlock[];
+}
 
 interface Chapter {
   id: string;
@@ -33,6 +41,7 @@ interface Chapter {
   videoUrl?: string;
   description?: string;
   completed?: boolean;
+  sections?: Section[];
 }
 
 interface Instructor {
@@ -68,7 +77,7 @@ export default function CourseView() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const [user] = useAuthState(auth);
-  
+
   const [course, setCourse] = useState<Course | null>(null);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [currentChapter, setCurrentChapter] = useState<Chapter | null>(null);
@@ -84,13 +93,13 @@ export default function CourseView() {
 
   const loadCourseData = async () => {
     if (!courseId) return;
-    
+
     try {
       const courseDoc = await getDoc(doc(db, 'courses', courseId));
       if (courseDoc.exists()) {
         const courseData = { id: courseDoc.id, ...courseDoc.data() } as Course;
         setCourse(courseData);
-        
+
         // Set first chapter as current if available
         if (courseData.chapters && courseData.chapters.length > 0) {
           setCurrentChapter(courseData.chapters[0]);
@@ -106,7 +115,7 @@ export default function CourseView() {
 
   const loadUserProgress = async () => {
     if (!user?.uid || !courseId) return;
-    
+
     try {
       const progressDoc = await getDoc(doc(db, 'userProgress', `${user.uid}_${courseId}`));
       if (progressDoc.exists()) {
@@ -203,8 +212,8 @@ export default function CourseView() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => navigate('/student/dashboard')}
               >
@@ -320,7 +329,7 @@ export default function CourseView() {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-semibold">{currentChapter.title}</h3>
-                          <Button 
+                          <Button
                             onClick={() => markChapterComplete(currentChapter.id)}
                             disabled={userProgress?.completedChapters.includes(currentChapter.id)}
                             className="bg-gradient-to-r from-indigo-600 to-purple-600"
@@ -337,9 +346,28 @@ export default function CourseView() {
                               </>
                             )}
                           </Button>
-                        </div>
-                        {currentChapter.description && (
+                        </div>                        {currentChapter.description && (
                           <p className="text-gray-700">{currentChapter.description}</p>
+                        )}
+
+                        {/* Affichage du contenu des sections */}
+                        {currentChapter.sections && currentChapter.sections.length > 0 && (
+                          <div className="space-y-6 mt-6">
+                            {currentChapter.sections.map((section) => (
+                              <div key={section.id} className="border-l-2 border-indigo-200 pl-4">
+                                <h4 className="text-lg font-medium text-gray-900 mb-4">{section.title}</h4>
+                                <div className="space-y-4">
+                                  {section.content.map((block) => (
+                                    <ContentBlockViewer
+                                      key={block.id}
+                                      block={block}
+                                      className="bg-white rounded-lg border border-gray-200 p-4"
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -397,24 +425,22 @@ export default function CourseView() {
                     {course.chapters.map((chapter, index) => {
                       const isCompleted = userProgress?.completedChapters.includes(chapter.id);
                       const isCurrent = currentChapter?.id === chapter.id;
-                      
+
                       return (
                         <button
                           key={chapter.id}
                           onClick={() => selectChapter(chapter)}
-                          className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                            isCurrent ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : ''
-                          }`}
+                          className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${isCurrent ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : ''
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                                isCompleted 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : isCurrent 
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${isCompleted
+                                  ? 'bg-green-100 text-green-700'
+                                  : isCurrent
                                     ? 'bg-indigo-100 text-indigo-700'
                                     : 'bg-gray-100 text-gray-600'
-                              }`}>
+                                }`}>
                                 {isCompleted ? (
                                   <CheckCircle className="h-4 w-4" />
                                 ) : (
