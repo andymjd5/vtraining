@@ -18,7 +18,6 @@ import {
   ArrowLeft,
   PlayCircle,
   Users,
-  Star,
   Award,
   ChevronRight,
   GraduationCap,
@@ -62,27 +61,6 @@ const toast = {
   error: (message: string) => console.error('❌', message)
 };
 
-// 📊 Interface pour les statistiques de progression
-interface ProgressStats {
-  totalContentBlocks: number;
-  completedContentBlocks: number;
-  currentContentBlock: string | null;
-  timeSpent: number; // en minutes
-  estimatedTimeRemaining: number; // en minutes
-}
-
-interface UserProgress {
-  courseId: string;
-  completedChapters: string[];
-  completedContentBlocks: string[];
-  currentChapter: string;
-  currentSection: string | null;
-  progressPercentage: number;
-  lastAccessedAt: any;
-  timeSpent: number; // temps total passé en minutes
-  lastContentBlockId: string | null;
-}
-
 export default function CourseView() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -91,11 +69,9 @@ export default function CourseView() {
   const [course, setCourse] = useState<CourseWithStructure | null>(null);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [currentChapter, setCurrentChapter] = useState<ChapterWithSections | null>(null);
-  const [currentSection, setCurrentSection] = useState<SectionWithContent | null>(null);
-  const [progressStats, setProgressStats] = useState<ProgressStats | null>(null);
+  const [currentSection, setCurrentSection] = useState<SectionWithContent | null>(null); const [progressStats, setProgressStats] = useState<ProgressStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(true);
-  const [enriching, setEnriching] = useState(false);
   // 🕒 États pour le tracking du temps réel
   const [currentBlockStartTime, setCurrentBlockStartTime] = useState<Date | null>(null);
   const [currentBlockId, setCurrentBlockId] = useState<string | null>(null);
@@ -134,14 +110,12 @@ export default function CourseView() {
       calculateProgressStats(course);
     }
   }, [userProgress, course]);
-
   // 🔄 Fonction modernisée pour charger le cours avec sa structure complète
   const loadCourseData = async () => {
     if (!courseId) return;
 
     try {
       setLoading(true);
-      setEnriching(true);
 
       // Charger le cours avec toute sa structure (chapitres, sections, blocs)
       const courseWithStructure = await courseService.loadCourseWithStructure(courseId);
@@ -166,9 +140,8 @@ export default function CourseView() {
       toast.error('Erreur lors du chargement du cours');
     } finally {
       setLoading(false);
-      setEnriching(false);
     }
-  };  // 📊 Calcul des statistiques de progression réelles
+  };// 📊 Calcul des statistiques de progression réelles
   const calculateProgressStats = (courseData: CourseWithStructure) => {
     if (!courseData.chapters) {
       setProgressStats({
@@ -211,6 +184,22 @@ export default function CourseView() {
       estimatedTimeRemaining
     });
   };
+  // 🔍 Fonction utilitaire pour récupérer tous les blocs d'un chapitre
+  const getAllContentBlocksForChapter = (chapterId: string): string[] => {
+    if (!course?.chapters) return [];
+
+    const chapter = course.chapters.find(ch => ch.id === chapterId);
+    if (!chapter) return [];
+
+    const blockIds: string[] = [];
+    chapter.sections.forEach(section => {
+      section.content.forEach(block => {
+        blockIds.push(block.id);
+      });
+    });
+
+    return blockIds;
+  };
 
   // 🕒 Fonctions de tracking du temps réel
   const startContentBlockTimer = (blockId: string) => {
@@ -222,17 +211,11 @@ export default function CourseView() {
     setCurrentBlockId(blockId);
     setCurrentBlockStartTime(new Date());
   };
-
   const stopContentBlockTimer = () => {
     if (currentBlockId && currentBlockStartTime) {
       const timeSpent = Math.round((new Date().getTime() - currentBlockStartTime.getTime()) / 1000 / 60); // en minutes
 
       if (timeSpent > 0) {
-        setBlockTimeSpent(prev => ({
-          ...prev,
-          [currentBlockId]: (prev[currentBlockId] || 0) + timeSpent
-        }));
-
         // Mettre à jour les progrès utilisateur
         if (userProgress && user?.uid && courseId) {
           const updatedProgress = {
@@ -298,14 +281,7 @@ export default function CourseView() {
       // Recalculer les statistiques
       if (course) {
         calculateProgressStats(course);
-      }
-
-      toast.success(chapterCompleted ? 'Chapitre terminé ! 🎉' : 'Bloc terminé ! ✅');
-
-      // Auto-navigation vers le prochain bloc
-      setTimeout(() => {
-        navigateToNextIncompleteBlock();
-      }, 1000);
+      } toast.success(chapterCompleted ? 'Chapitre terminé ! 🎉' : 'Bloc terminé ! ✅');
 
     } catch (error) {
       console.error('Erreur lors de la mise à jour des progrès:', error);
@@ -313,115 +289,185 @@ export default function CourseView() {
     }
   };
 
-  // 🧭 Naviguer automatiquement vers le prochain bloc non terminé
-  const navigateToNextIncompleteBlock = () => {
-    if (!course?.chapters || !userProgress || !currentSection) return;
+  // 🧭 Fonctions de navigation manuelle entre chapitres
+  const goToPreviousChapter = () => {
+    if (!course?.chapters || !currentChapter) return;
 
-    // D'abord, chercher dans la section actuelle
-    const currentSectionIndex = currentSection.content.findIndex(block =>
-      userProgress.lastContentBlockId === block.id
-    );    // Chercher le prochain bloc dans la section actuelle
-    for (let i = currentSectionIndex + 1; i < currentSection.content.length; i++) {
-      const block = currentSection.content[i];
-      if (!(userProgress.completedContentBlocks || []).includes(block.id)) {
-        startContentBlockTimer(block.id);
-        return;
-      }
+    const currentIndex = course.chapters.findIndex(ch => ch.id === currentChapter.id);
+    if (currentIndex > 0) {
+      const previousChapter = course.chapters[currentIndex - 1];
+      selectChapter(previousChapter);
+      toast.success(`Navigation vers "${previousChapter.title}"`);
     }
+  };
 
-    // Si pas de bloc suivant dans la section actuelle, chercher dans les sections suivantes
-    const currentChapterIndex = course.chapters.findIndex(ch => ch.id === currentChapter?.id);
-    if (currentChapterIndex === -1) return;
+  const goToNextChapter = () => {
+    if (!course?.chapters || !currentChapter) return;
 
-    const currentChapter = course.chapters[currentChapterIndex];
-    const currentSectionIdx = currentChapter.sections.findIndex(sec => sec.id === currentSection.id);    // Chercher dans les sections suivantes du même chapitre
-    for (let i = currentSectionIdx + 1; i < currentChapter.sections.length; i++) {
-      const section = currentChapter.sections[i];
-      for (const block of section.content) {
-        if (!(userProgress.completedContentBlocks || []).includes(block.id)) {
-          setCurrentSection(section);
-          setTimeout(() => startContentBlockTimer(block.id), 100);
-          return;
-        }
-      }
-    }    // Chercher dans les chapitres suivants
-    for (let i = currentChapterIndex + 1; i < course.chapters.length; i++) {
-      const chapter = course.chapters[i];
-      for (const section of chapter.sections) {
-        for (const block of section.content) {
-          if (!(userProgress.completedContentBlocks || []).includes(block.id)) {
-            setCurrentChapter(chapter);
-            setCurrentSection(section);
-            setTimeout(() => startContentBlockTimer(block.id), 100);
-            return;
-          }
+    const currentIndex = course.chapters.findIndex(ch => ch.id === currentChapter.id);
+    if (currentIndex < course.chapters.length - 1) {
+      const nextChapter = course.chapters[currentIndex + 1];
+      selectChapter(nextChapter);
+      toast.success(`Navigation vers "${nextChapter.title}"`);
+    }
+  };
+
+  // 🧭 Fonctions de navigation section par section
+  const goToPreviousSection = () => {
+    if (!course?.chapters || !currentChapter || !currentSection) return;
+
+    // Trouver l'index de la section actuelle dans le chapitre actuel
+    const currentSectionIndex = currentChapter.sections.findIndex(
+      section => section.id === currentSection.id
+    );
+
+    // S'il y a une section précédente dans le même chapitre
+    if (currentSectionIndex > 0) {
+      const previousSection = currentChapter.sections[currentSectionIndex - 1];
+      selectSection(previousSection);
+      toast.success(`Navigation vers "${previousSection.title}"`);
+    }
+    // Sinon, aller à la dernière section du chapitre précédent
+    else {
+      const currentChapterIndex = course.chapters.findIndex(ch => ch.id === currentChapter.id);
+      if (currentChapterIndex > 0) {
+        const previousChapter = course.chapters[currentChapterIndex - 1];
+        if (previousChapter.sections.length > 0) {
+          // Aller à la dernière section du chapitre précédent
+          const lastSection = previousChapter.sections[previousChapter.sections.length - 1];
+          setCurrentChapter(previousChapter); // Changer le chapitre
+          selectSection(lastSection);
+          toast.success(`Navigation vers "${previousChapter.title} - ${lastSection.title}"`);
         }
       }
     }
   };
 
-  // 🔍 Obtenir tous les content blocks d'un chapitre
-  const getAllContentBlocksForChapter = (chapterId: string): string[] => {
-    if (!course?.chapters) return [];
+  const goToNextSection = () => {
+    if (!course?.chapters || !currentChapter || !currentSection) return;
 
-    const chapter = course.chapters.find(ch => ch.id === chapterId);
-    if (!chapter) return [];
+    // Trouver l'index de la section actuelle dans le chapitre actuel
+    const currentSectionIndex = currentChapter.sections.findIndex(
+      section => section.id === currentSection.id
+    );
 
-    const blockIds: string[] = [];
-    chapter.sections.forEach(section => {
-      section.content.forEach(block => {
-        blockIds.push(block.id);
-      });
-    });
-
-    return blockIds;
-  };  // 🚀 Reprendre là où l'utilisateur s'est arrêté
-  const resumeFromLastPosition = () => {
-    if (!course?.chapters || !userProgress) return;
-
-    // Trouver le premier bloc non terminé
-    for (const chapter of course.chapters) {
-      for (const section of chapter.sections) {
-        for (const block of section.content) {
-          if (!(userProgress.completedContentBlocks || []).includes(block.id)) {
-            // Naviguer vers le bon chapitre et section
-            setCurrentChapter(chapter);
-            setCurrentSection(section);
-
-            // Attendre un peu pour que le DOM se mette à jour, puis démarrer le timer
-            setTimeout(() => {
-              startContentBlockTimer(block.id);
-
-              // Faire défiler jusqu'au bloc
-              const blockElement = document.querySelector(`[data-block-id="${block.id}"]`);
-              if (blockElement) {
-                blockElement.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'center'
-                });
-              }
-            }, 100);
-
-            toast.success(`Reprise du cours au chapitre "${chapter.title}"`);
-            return;
-          }
+    // S'il y a une section suivante dans le même chapitre
+    if (currentSectionIndex < currentChapter.sections.length - 1) {
+      const nextSection = currentChapter.sections[currentSectionIndex + 1];
+      selectSection(nextSection);
+      toast.success(`Navigation vers "${nextSection.title}"`);
+    }
+    // Sinon, aller à la première section du chapitre suivant
+    else {
+      const currentChapterIndex = course.chapters.findIndex(ch => ch.id === currentChapter.id);
+      if (currentChapterIndex < course.chapters.length - 1) {
+        const nextChapter = course.chapters[currentChapterIndex + 1];
+        if (nextChapter.sections.length > 0) {
+          // Aller à la première section du chapitre suivant
+          const firstSection = nextChapter.sections[0];
+          setCurrentChapter(nextChapter); // Changer le chapitre
+          selectSection(firstSection);
+          toast.success(`Navigation vers "${nextChapter.title} - ${firstSection.title}"`);
         }
       }
     }
+  };
 
-    toast.success('Félicitations ! Vous avez terminé tout le cours !');
+  // 🔍 Fonctions utilitaires pour la navigation
+  const getCurrentChapterIndex = () => {
+    if (!course?.chapters || !currentChapter) return -1;
+    return course.chapters.findIndex(ch => ch.id === currentChapter.id);
+  };
+
+  const hasPreviousChapter = () => {
+    return getCurrentChapterIndex() > 0;
+  };
+
+  const hasNextChapter = () => {
+    const currentIndex = getCurrentChapterIndex();
+    return currentIndex >= 0 && currentIndex < (course?.chapters?.length || 0) - 1;
+  };
+
+  // Fonctions pour vérifier s'il y a une section précédente ou suivante (incluant entre chapitres)
+  const hasPreviousSection = () => {
+    if (!course?.chapters || !currentChapter || !currentSection) return false;
+
+    const currentSectionIndex = currentChapter.sections.findIndex(
+      section => section.id === currentSection.id
+    );
+
+    // S'il y a une section précédente dans le chapitre actuel
+    if (currentSectionIndex > 0) {
+      return true;
+    }
+
+    // Sinon, vérifier s'il y a un chapitre précédent avec des sections
+    const currentChapterIndex = course.chapters.findIndex(ch => ch.id === currentChapter.id);
+    return currentChapterIndex > 0 && course.chapters[currentChapterIndex - 1].sections.length > 0;
+  };
+
+  const hasNextSection = () => {
+    if (!course?.chapters || !currentChapter || !currentSection) return false;
+
+    const currentSectionIndex = currentChapter.sections.findIndex(
+      section => section.id === currentSection.id
+    );
+
+    // S'il y a une section suivante dans le chapitre actuel
+    if (currentSectionIndex < currentChapter.sections.length - 1) {
+      return true;
+    }
+
+    // Sinon, vérifier s'il y a un chapitre suivant avec des sections
+    const currentChapterIndex = course.chapters.findIndex(ch => ch.id === currentChapter.id);
+    return currentChapterIndex < course.chapters.length - 1 &&
+      course.chapters[currentChapterIndex + 1].sections.length > 0;
+  };
+  // 🚀 Modifier la fonction resumeFromLastPosition pour être plus simple
+  const resumeFromLastPosition = () => {
+    if (!course?.chapters || !userProgress) return;
+
+    // Si l'utilisateur a un chapitre et section courants dans ses progrès, y aller
+    if (userProgress.currentChapter) {
+      const savedChapter = course.chapters.find(ch => ch.id === userProgress.currentChapter);
+      if (savedChapter) {
+        setCurrentChapter(savedChapter);
+
+        if (userProgress.currentSection && savedChapter.sections) {
+          const savedSection = savedChapter.sections.find(s => s.id === userProgress.currentSection);
+          if (savedSection) {
+            setCurrentSection(savedSection);
+            toast.success(`Reprise du cours au chapitre "${savedChapter.title}"`);
+            return;
+          }
+        }
+
+        // Si pas de section sauvée, prendre la première du chapitre
+        if (savedChapter.sections.length > 0) {
+          setCurrentSection(savedChapter.sections[0]);
+        }
+        toast.success(`Reprise du cours au chapitre "${savedChapter.title}"`);
+        return;
+      }
+    }
+
+    // Sinon, aller au premier chapitre
+    if (course.chapters.length > 0) {
+      const firstChapter = course.chapters[0];
+      setCurrentChapter(firstChapter);
+      if (firstChapter.sections.length > 0) {
+        setCurrentSection(firstChapter.sections[0]);
+      }
+      toast.success('Démarrage du cours');
+    }
   };
   const loadUserProgress = async () => {
     if (!user?.uid || !courseId) return;
 
     try {
-      const progressDoc = await getDoc(doc(db, 'userProgress', `${user.uid}_${courseId}`));
-      if (progressDoc.exists()) {
+      const progressDoc = await getDoc(doc(db, 'userProgress', `${user.uid}_${courseId}`)); if (progressDoc.exists()) {
         const progress = progressDoc.data() as UserProgress;
         setUserProgress(progress);
-
-        // Charger les temps passés par bloc
-        setBlockTimeSpent(progress.contentBlocksTimeSpent || {});
 
         // Restaurer la position dans le cours
         if (course?.chapters && progress.currentChapter) {
@@ -545,11 +591,17 @@ export default function CourseView() {
       setDoc(doc(db, 'userProgress', `${user.uid}_${courseId}`), updatedProgress);
       setUserProgress(updatedProgress);
     }
-  };
-  // 📍 Sélectionner une section spécifique
+  };  // 📍 Sélectionner une section spécifique avec comptabilisation du temps
   const selectSection = (section: SectionWithContent) => {
-    // Arrêter le timer actuel
-    stopContentBlockTimer(); setCurrentSection(section);
+    // Arrêter le timer actuel et enregistrer le temps passé
+    stopContentBlockTimer();
+
+    // Sauvegarder le timestamp de changement de section
+    const sectionChangeTime = new Date();
+
+    // Définir la section courante
+    setCurrentSection(section);
+    setVideoLoading(true); // Réinitialiser le statut de chargement si nécessaire
 
     // Commencer le timer pour le premier bloc non terminé de cette section
     const firstIncompleteBlock = section.content.find(block =>
@@ -560,16 +612,47 @@ export default function CourseView() {
       startContentBlockTimer(firstIncompleteBlock.id);
     }
 
-    // Mettre à jour les progrès utilisateur
+    // Si le chapitre courant ne correspond pas à celui de la section, mettre à jour
+    if (currentChapter && section.chapterId !== currentChapter.id) {
+      const newChapter = course?.chapters?.find(ch => ch.id === section.chapterId);
+      if (newChapter) {
+        setCurrentChapter(newChapter);
+      }
+    }
+
+    // Mettre à jour les progrès utilisateur avec plus d'informations
     if (userProgress && user?.uid && courseId) {
+      // Calculer le temps estimé pour cette section (2 minutes par bloc de contenu par défaut)
+      const sectionTimeEstimate = section.content.reduce((total, block) => {
+        if (block.type === 'media' && block.media?.duration) {
+          return total + Math.ceil(block.media.duration / 60); // Convertir secondes en minutes
+        } else {
+          return total + 2; // 2 minutes par défaut pour les autres types
+        }
+      }, 0);
+
       const updatedProgress = {
         ...userProgress,
+        currentChapter: section.chapterId,
         currentSection: section.id,
-        lastAccessedAt: new Date()
+        lastAccessedAt: sectionChangeTime,
+        // Ajouter une entrée pour le temps passé sur cette section
+        contentBlocksTimeSpent: {
+          ...userProgress.contentBlocksTimeSpent,
+          [`section_${section.id}`]: (userProgress.contentBlocksTimeSpent?.[`section_${section.id}`] || 0) + 1
+        },
+        // Estimation pour cette section
+        sectionTimeEstimates: {
+          ...(userProgress.sectionTimeEstimates || {}),
+          [section.id]: sectionTimeEstimate
+        }
       };
 
       setDoc(doc(db, 'userProgress', `${user.uid}_${courseId}`), updatedProgress);
       setUserProgress(updatedProgress);
+
+      // Toast de confirmation avec temps estimé
+      toast.success(`Section "${section.title}" - Temps estimé: ${sectionTimeEstimate} min`);
     }
   };
 
@@ -616,9 +699,7 @@ export default function CourseView() {
                 <GraduationCap className="h-6 w-6 text-white" />
               </div>
             </div>
-          </div>
-
-          <div className="backdrop-blur-sm bg-white/30 rounded-2xl px-8 py-6 border border-white/20 shadow-xl">
+          </div>          <div className="backdrop-blur-sm bg-white/30 rounded-2xl px-8 py-6 border border-white/20 shadow-xl">
             <h3 className="text-xl font-semibold text-gray-800 mb-2">Chargement du cours</h3>
             <div className="flex items-center justify-center space-x-2">
               <div className="flex space-x-1">
@@ -627,11 +708,6 @@ export default function CourseView() {
                 <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
-            {enriching && (
-              <p className="text-sm text-gray-600 mt-3">
-                Préparation de votre expérience d'apprentissage...
-              </p>
-            )}
           </div>
         </div>
       </div>
@@ -820,6 +896,41 @@ export default function CourseView() {
                             </div>
                             <h3 className="text-xl font-bold text-gray-900">{currentChapter.title}</h3>
                           </div>
+
+                          {/* Indicateur de progression des sections et navigation de chapitre */}
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-500">
+                                Section {currentSection ? currentChapter.sections.findIndex(s => s.id === currentSection.id) + 1 : 1} sur {currentChapter.sections.length}
+                              </span>
+                              <Progress
+                                value={currentSection ? ((currentChapter.sections.findIndex(s => s.id === currentSection.id) + 1) / currentChapter.sections.length) * 100 : 0}
+                                className="w-32 h-2"
+                              />
+                            </div>                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={goToPreviousChapter}
+                                disabled={!hasPreviousChapter()}
+                                className="text-gray-500 hover:text-blue-600"
+                              >
+                                <ArrowLeft className="h-4 w-4" />
+                                <span className="ml-1">Chapitre précédent</span>
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={goToNextChapter}
+                                disabled={!hasNextChapter()}
+                                className="text-gray-500 hover:text-blue-600"
+                              >
+                                <span className="mr-1">Chapitre suivant</span>
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+
                           {currentChapter.description && (
                             <p className="text-gray-700 mb-4">{currentChapter.description}</p>
                           )}
@@ -854,25 +965,42 @@ export default function CourseView() {
                               Terminer ce chapitre
                             </>
                           )}
-                        </Button>
-                      </div>
+                        </Button>                      </div>
 
                       {/* Navigation entre sections */}
                       {currentChapter.sections.length > 1 && (
                         <div className="flex flex-wrap gap-2 p-4 bg-gray-50 rounded-xl">
                           <span className="text-sm font-medium text-gray-700 mr-2">Sections :</span>
-                          {currentChapter.sections.map((section) => (
-                            <button
-                              key={section.id}
-                              onClick={() => selectSection(section)}
-                              className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${currentSection?.id === section.id
-                                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
-                                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                                }`}
-                            >
-                              {section.title}
-                            </button>
-                          ))}
+                          <div className="flex flex-wrap gap-2">
+                            {currentChapter.sections.map((section, index) => {
+                              // Vérifier si la section est complétée (tous les blocs sont terminés)
+                              const isCompleted = section.content.every(
+                                block => userProgress?.completedContentBlocks?.includes(block.id)
+                              );
+
+                              return (
+                                <button
+                                  key={section.id}
+                                  onClick={() => selectSection(section)}
+                                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center
+                                    ${currentSection?.id === section.id
+                                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                                      : isCompleted
+                                        ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                                    }`}
+                                >
+                                  <span className="w-5 h-5 mr-1.5 inline-flex items-center justify-center rounded-full bg-white bg-opacity-20 text-xs">
+                                    {index + 1}
+                                  </span>
+                                  {section.title}
+                                  {isCompleted && (
+                                    <CheckCircle className="h-3.5 w-3.5 ml-1.5 text-green-500" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
@@ -902,14 +1030,72 @@ export default function CourseView() {
                                   </div>
                                 );
                               })}
+
                             </div>
                           ) : (
                             <div className="text-center py-8">
                               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                               <p className="text-gray-600">Aucun contenu disponible pour cette section</p>
-                            </div>
-                          )}
+                            </div>)}
                         </div>
+                      </div>                      {/* Résumé du temps passé sur cette section */}
+                      {currentSection && (
+                        <div className="mt-6 mb-2 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 text-blue-500 mr-2" />
+                              <span className="text-sm font-medium text-blue-700">Temps sur cette section</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div>
+                                <span className="text-xs text-gray-500 mr-1">Estimé:</span>
+                                <span className="text-sm font-medium text-gray-700">
+                                  {currentSection.content.reduce((total, block) => {
+                                    return block.type === 'media' && block.media?.duration
+                                      ? total + Math.ceil(block.media.duration / 60)
+                                      : total + 2;
+                                  }, 0)} min
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-xs text-gray-500 mr-1">Passé:</span>
+                                <span className="text-sm font-medium text-gray-700">
+                                  {userProgress?.contentBlocksTimeSpent?.[`section_${currentSection.id}`] || 0} min
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-xs text-gray-500 mr-1">Blocs:</span>
+                                <span className="text-sm font-medium text-gray-700">
+                                  {currentSection.content.filter(block =>
+                                    userProgress?.completedContentBlocks?.includes(block.id)
+                                  ).length} / {currentSection.content.length}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Navigation entre sections (en fin de section) */}
+                      <div className="flex justify-between mt-8 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200">
+                        <Button
+                          variant="outlined"
+                          onClick={goToPreviousSection}
+                          disabled={!hasPreviousSection()}
+                          className="bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl px-5 py-2 transition-all duration-200 flex items-center space-x-2"
+                        >
+                          <ArrowLeft className="h-4 w-4 mr-1" />
+                          <span>Section précédente</span>
+                        </Button>
+
+                        <Button
+                          variant="outlined"
+                          onClick={goToNextSection}
+                          disabled={!hasNextSection()}
+                          className="bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl px-5 py-2 transition-all duration-200 flex items-center space-x-2"
+                        >                          <span>Section suivante</span>
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -932,25 +1118,10 @@ export default function CourseView() {
                         </h4>
                         <p className="text-gray-700 leading-relaxed">{course.description}</p>
                       </div>
-                    </div>
-
-                    {/* Statistiques du cours */}
+                    </div>                    {/* Statistiques du cours */}
                     <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                       <h4 className="font-semibold text-gray-900 mb-4">Statistiques</h4>
-                      <div className="space-y-4">                        <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm text-gray-600">Étudiants inscrits</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">Non disponible</span>
-                      </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Star className="h-4 w-4 text-yellow-500" />
-                            <span className="text-sm text-gray-600">Évaluation</span>
-                          </div>
-                          <span className="font-semibold text-gray-900">Pas encore noté</span>
-                        </div>
+                      <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <BookOpen className="h-4 w-4 text-green-600" />
