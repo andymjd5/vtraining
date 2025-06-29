@@ -120,8 +120,10 @@ const Home = () => {
               className="text-lg md:text-xl mb-8 text-white/90 max-w-3xl mx-auto"
               variants={fadeIn}
             >
-              Développez vos compétences grâce à notre programme e-learning dédié 
-              aux institutions publiques, entreprises publiques, entreprises privées et pour la société civile.
+              <span className="line-clamp-2">
+                Développez vos compétences grâce à notre programme e-learning dédié 
+                aux institutions publiques, entreprises publiques, entreprises privées et pour la société civile.
+              </span>
             </motion.p>
             <motion.div variants={fadeIn}>
               <Link to="/login">
@@ -172,9 +174,11 @@ const Home = () => {
                 transition={{ delay: index * 0.1 }}
               >
                 <Card className="h-full flex flex-col">
-                  <div className="mb-4">{feature.icon}</div>
-                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-gray-600 flex-grow">{feature.description}</p>
+                  <div className="p-6">
+                    <div className="mb-4">{feature.icon}</div>
+                    <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                    <p className="text-gray-600 flex-grow line-clamp-3">{feature.description}</p>
+                  </div>
                 </Card>
               </motion.div>
             ))}
@@ -212,7 +216,7 @@ const Home = () => {
                       />
                     </div>
                     <div className="p-6">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{category.name}</h3>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2 truncate">{category.name}</h3>
                       <div className="flex items-center text-primary-600 font-medium">
                         <span>Explorer les cours</span>
                         <ArrowRight className="h-4 w-4 ml-2" />
@@ -235,7 +239,9 @@ const Home = () => {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-6">Prêt à commencer votre formation ?</h2>
             <p className="text-lg mb-8 text-white/90">
-              Rejoignez nos autres partenaires et perfectionnez vos compétences avec notre programme d'apprentissage professionnel en ligne.
+              <span className="line-clamp-2">
+                Rejoignez nos autres partenaires et perfectionnez vos compétences avec notre programme d'apprentissage professionnel en ligne.
+              </span>
             </p>
             <Link to="/login">
               <Button 
