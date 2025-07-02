@@ -12,6 +12,8 @@ import { UserRole } from './types';
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
+const EventsPage = lazy(() => import('./pages/EventsPage'));
+const CoursesPage = lazy(() => import('./pages/CoursesPage'));
 const CompanySelection = lazy(() => import('./pages/auth/CompanySelection'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const SuperAdminLogin = lazy(() => import('./pages/auth/SuperAdminLogin'));
@@ -64,6 +66,8 @@ function App() {
             <Route index element={<Home />} />
             <Route path="about" element={<About />} />
             <Route path="contact" element={<Contact />} />
+            <Route path="evenements" element={<EventsPage />} />
+            <Route path="formations" element={<CoursesPage />} />
           </Route>
 
           {/* Auth routes */}

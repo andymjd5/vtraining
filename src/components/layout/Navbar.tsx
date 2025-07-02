@@ -22,8 +22,8 @@ const Navbar = () => {
   const menuItems = [
     { name: 'Accueil', path: '/' },
     { name: 'À propos', path: '/about' },
-    { name: 'Formations', path: '/courses' },
-    { name: 'Événements', path: '/events' },
+    { name: 'Formations', path: '/formations' },
+    { name: 'Événements', path: '/evenements' },
     { name: 'Contact', path: '/contact' },
   ];
 
