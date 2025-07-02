@@ -1,182 +1,158 @@
 // src/services/mediaService.ts
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { storage } from '../lib/firebase';
-import { uuidv4 } from '@firebase/util';
+
+export interface MediaUploadResult {
+    id: string;
+    url: string;
+    thumbnailUrl?: string;
+    duration?: number;
+    fileSize: number;
+    mimeType: string;
+}
 
 /**
  * Service pour la gestion des médias (images, vidéos)
  */
 export const mediaService = {
     /**
-     * Télécharge une vidéo d'introduction de cours
-     * @param file Fichier vidéo
-     * @param courseId ID du cours
-     * @param onProgress Callback de progression
-     * @returns URL de la vidéo téléchargée et URL de la miniature
+     * Upload d'un fichier média avec progression
      */
-    async uploadCourseIntroVideo(
+    async uploadMedia(
         file: File,
-        courseId: string,
+        type: 'image' | 'video' | 'audio',
         onProgress?: (progress: number) => void
-    ): Promise<{ url: string; thumbnailUrl?: string }> {
-        try {
-            const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp4';
-            const fileName = `courses/${courseId}/intro_${Date.now()}.${fileExt}`;
-            const storageRef = ref(storage, fileName);
+    ): Promise<MediaUploadResult> {
+        const fileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const fileName = `${fileId}.${file.name.split('.').pop()}`;
+        const filePath = `course-media/${type}s/${fileName}`;
 
-            const uploadTask = uploadBytesResumable(storageRef, file);
+        const storageRef = ref(storage, filePath);
+        const uploadTask = uploadBytesResumable(storageRef, file);
 
-            return new Promise((resolve, reject) => {
-                uploadTask.on(
-                    'state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        if (onProgress) onProgress(progress);
-                    },
-                    (error) => {
-                        console.error('Error uploading video:', error);
-                        reject(error);
-                    },
-                    async () => {
-                        const url = await getDownloadURL(uploadTask.snapshot.ref);
-                        // On pourrait ici générer une miniature avec une fonction Cloud Function
-                        resolve({ url });
-                    }
-                );
-            });
-        } catch (error) {
-            console.error('Error in uploadCourseIntroVideo:', error);
-            throw error;
-        }
-    },
+        return new Promise((resolve, reject) => {
+            uploadTask.on(
+                'state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    onProgress?.(progress);
+                },
+                (error) => {
+                    console.error('Erreur upload:', error);
+                    reject(error);
+                },
+                async () => {
+                    try {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
 
-    /**
-     * Télécharge une photo de profil d'instructeur
-     * @param file Fichier image
-     * @param instructorId ID de l'instructeur
-     * @param onProgress Callback de progression
-     * @returns URL de l'image téléchargée
-     */
-    async uploadInstructorPhoto(
-        file: File,
-        instructorId: string,
-        onProgress?: (progress: number) => void
-    ): Promise<string> {
-        try {
-            const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-            const fileName = `instructors/${instructorId}/profile_${Date.now()}.${fileExt}`;
-            const storageRef = ref(storage, fileName);
+                        let duration: number | undefined;
+                        let thumbnailUrl: string | undefined;
 
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            return new Promise((resolve, reject) => {
-                uploadTask.on(
-                    'state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        if (onProgress) onProgress(progress);
-                    },
-                    (error) => {
-                        console.error('Error uploading instructor photo:', error);
-                        reject(error);
-                    },
-                    async () => {
-                        const url = await getDownloadURL(uploadTask.snapshot.ref);
-                        resolve(url);
-                    }
-                );
-            });
-        } catch (error) {
-            console.error('Error in uploadInstructorPhoto:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Télécharge une image ou vidéo pour le contenu d'un cours
-     * @param file Fichier média
-     * @param courseId ID du cours
-     * @param chapterId ID du chapitre
-     * @param sectionId ID de la section
-     * @param type Type de média ('image' ou 'video')
-     * @param onProgress Callback de progression
-     * @returns URL du média téléchargé et autres métadonnées
-     */
-    async uploadCourseMedia(
-        file: File,
-        courseId: string,
-        chapterId: string,
-        sectionId: string,
-        type: 'image' | 'video',
-        onProgress?: (progress: number) => void
-    ): Promise<{ url: string; thumbnailUrl?: string; type: 'image' | 'video'; id: string }> {
-        try {
-            const fileExt = file.name.split('.').pop()?.toLowerCase() || (type === 'image' ? 'jpg' : 'mp4');
-            const mediaId = uuidv4();
-            const fileName = `courses/${courseId}/chapters/${chapterId}/sections/${sectionId}/${mediaId}.${fileExt}`;
-            const storageRef = ref(storage, fileName);
-
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            return new Promise((resolve, reject) => {
-                uploadTask.on(
-                    'state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        if (onProgress) onProgress(progress);
-                    },
-                    (error) => {
-                        console.error('Error uploading course media:', error);
-                        reject(error);
-                    },
-                    async () => {
-                        const url = await getDownloadURL(uploadTask.snapshot.ref);
-                        // Pour les vidéos, on pourrait générer une miniature
-                        const result = { url, type, id: mediaId };
-
-                        if (type === 'video') {
-                            // Logique pour générer une miniature - à implémenter avec une Cloud Function
-                            // Pour l'instant, on ne fait rien de spécial
+                        // Pour les vidéos et audios, on pourrait extraire la durée
+                        if (type === 'video' || type === 'audio') {
+                            duration = await this.getMediaDuration(file);
                         }
 
-                        resolve(result);
+                        // Pour les vidéos, on pourrait générer une miniature
+                        if (type === 'video') {
+                            thumbnailUrl = await this.generateVideoThumbnail(file);
+                        }
+
+                        resolve({
+                            id: fileId,
+                            url: downloadURL,
+                            thumbnailUrl,
+                            duration,
+                            fileSize: file.size,
+                            mimeType: file.type
+                        });
+                    } catch (error) {
+                        reject(error);
                     }
-                );
-            });
-        } catch (error) {
-            console.error('Error in uploadCourseMedia:', error);
-            throw error;
-        }
+                }
+            );
+        });
     },
 
     /**
-     * Supprime un média
-     * @param url URL du média à supprimer
+     * Obtenir la durée d'un fichier média
      */
-    async deleteMedia(url: string): Promise<void> {
-        try {
-            const storageRef = ref(storage, url);
-            await deleteObject(storageRef);
-        } catch (error) {
-            console.error('Error deleting media:', error);
-            throw error;
-        }
+    async getMediaDuration(file: File): Promise<number | undefined> {
+        return new Promise((resolve) => {
+            const url = URL.createObjectURL(file);
+
+            if (file.type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.src = url;
+                video.onloadedmetadata = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(Math.round(video.duration));
+                };
+                video.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(undefined);
+                };
+            } else if (file.type.startsWith('audio/')) {
+                const audio = document.createElement('audio');
+                audio.src = url;
+                audio.onloadedmetadata = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(Math.round(audio.duration));
+                };
+                audio.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(undefined);
+                };
+            } else {
+                URL.revokeObjectURL(url);
+                resolve(undefined);
+            }
+        });
     },
 
     /**
-     * Génère une URL signée temporaire pour un média
-     * @param url URL du média
-     * @param expirationTimeMinutes Durée de validité en minutes
-     * @returns URL signée
+     * Générer une miniature pour une vidéo
      */
-    async getSignedUrl(url: string, expirationTimeMinutes: number = 60): Promise<string> {
-        try {
-            // Cette fonctionnalité nécessite une Cloud Function
-            // Pour l'instant, on retourne simplement l'URL telle quelle
-            return url;
-        } catch (error) {
-            console.error('Error getting signed URL:', error);
-            throw error;
-        }
+    async generateVideoThumbnail(file: File): Promise<string | undefined> {
+        return new Promise((resolve) => {
+            const url = URL.createObjectURL(file);
+            const video = document.createElement('video');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            video.src = url;
+            video.currentTime = 1; // Prendre la miniature à 1 seconde
+
+            video.onloadeddata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                ctx?.drawImage(video, 0, 0);
+
+                canvas.toBlob(async (blob) => {
+                    if (blob) {
+                        try {
+                            // Upload de la miniature
+                            const thumbnailRef = ref(storage, `course-media/thumbnails/${Date.now()}_thumbnail.jpg`);
+                            await uploadBytes(thumbnailRef, blob);
+                            const thumbnailUrl = await getDownloadURL(thumbnailRef);
+                            resolve(thumbnailUrl);
+                        } catch (error) {
+                            console.error('Erreur génération miniature:', error);
+                            resolve(undefined);
+                        }
+                    } else {
+                        resolve(undefined);
+                    }
+                }, 'image/jpeg', 0.8);
+
+                URL.revokeObjectURL(url);
+            };
+
+            video.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve(undefined);
+            };
+        });
     }
 };

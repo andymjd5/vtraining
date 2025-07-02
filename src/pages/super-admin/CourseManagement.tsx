@@ -1,29 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from "../../lib/firebase";
-import { Plus, Edit2, Trash2, Users, Clock, BookOpen, Building2, X, Filter, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Clock, BookOpen, Building2, X, Filter, Search, User, Play, Calendar } from 'lucide-react';
 import CourseForm from './CourseForm';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useToast } from '../../hooks/useToast';
+import { courseService } from '../../services/courseService';
+import { instructorService } from '../../services/instructorService';
+import { Course } from '../../types/course';
 
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  categoryId: string;
-  level: string;
-  duration: number;
-  videoUrl?: string;
-  assignedTo: string[];
-  createdAt: any;
+interface CourseWithStats extends Course {
+  instructor?: {
+    id: string;
+    name: string;
+    title?: string;
+    photoUrl?: string;
+  };
+  chapterCount?: number;
+  sectionCount?: number;
+  contentBlockCount?: number;
 }
 
 const CourseManagement: React.FC = () => {
   const { success, error: showError } = useToast();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [courses, setCourses] = useState<CourseWithStats[]>([]); const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string; email?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -33,39 +35,90 @@ const CourseManagement: React.FC = () => {
 
   // States for filters
   const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
-
   useEffect(() => {
-    const q = query(collection(db, 'courses'), orderBy('createdAt', 'desc'));
+    const loadCoursesWithStats = async () => {
+      setLoading(true);
+      try {
+        // Charger les cours
+        const coursesData = await courseService.getAllCourses();
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const coursesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Course[];
-      setCourses(coursesData);
-      setLoading(false);
-    });
+        // Charger les instructeurs
+        const instructorsData = await instructorService.getAllInstructors();
 
-    return () => unsubscribe();
-  }, []);
+        // Enrichir les cours avec des statistiques et informations d'instructeur
+        const coursesWithStats = await Promise.all(
+          coursesData.map(async (course) => {
+            const enrichedCourse: CourseWithStats = { ...course };
 
-  // Charger les catégories Firestore
+            // Ajouter les informations de l'instructeur
+            if (course.instructorId) {
+              const instructor = instructorsData.find(inst => inst.id === course.instructorId);
+              if (instructor) {
+                enrichedCourse.instructor = {
+                  id: instructor.id,
+                  name: instructor.name,
+                  title: instructor.title,
+                  photoUrl: instructor.photoUrl
+                };
+              }
+            }
+
+            // Compter les chapitres, sections et blocs de contenu
+            try {
+              const [chaptersSnapshot, sectionsSnapshot, blocksSnapshot] = await Promise.all([
+                getDocs(query(collection(db, 'chapters'), where('courseId', '==', course.id))),
+                getDocs(query(collection(db, 'sections'), where('courseId', '==', course.id))),
+                getDocs(query(collection(db, 'content_blocks'), where('courseId', '==', course.id)))
+              ]);
+
+              enrichedCourse.chapterCount = chaptersSnapshot.size;
+              enrichedCourse.sectionCount = sectionsSnapshot.size;
+              enrichedCourse.contentBlockCount = blocksSnapshot.size;
+            } catch (error) {
+              console.error('Error loading course stats:', error);
+              enrichedCourse.chapterCount = 0;
+              enrichedCourse.sectionCount = 0;
+              enrichedCourse.contentBlockCount = 0;
+            }
+
+            return enrichedCourse;
+          }));
+
+        setCourses(coursesWithStats);
+      } catch (error) {
+        console.error('Error loading courses:', error);
+        showError('Erreur lors du chargement des cours');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCoursesWithStats();
+  }, [showError]);
+
+  // Charger les catégories et entreprises
   useEffect(() => {
     const fetchCategories = async () => {
       const catSnap = await getDocs(collection(db, 'categories'));
-      setCategories(catSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCategories(catSnap.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name || doc.id
+      })));
     };
 
     const fetchCompanies = async () => {
       const companiesSnap = await getDocs(collection(db, 'companies'));
-      setCompanies(companiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCompanies(companiesSnap.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name || doc.id,
+        email: doc.data().email
+      })));
     };
     fetchCategories();
     fetchCompanies();
-  }, []);
-
-  // Adapter les filtres pour utiliser categoryId
+  }, []);  // Import manquant pour la nouvelle structure de filtre
   const availableCategories = useMemo(() => {
     const ids = Array.from(new Set(courses.map(course => course.categoryId).filter(Boolean)));
     return ids.map(id => {
@@ -73,18 +126,19 @@ const CourseManagement: React.FC = () => {
       return cat ? cat : { id, name: id };
     });
   }, [courses, categories]);
-
   // Filter courses
   const filteredCourses = useMemo(() => {
     return courses.filter(course => {
       const matchesCategory = !filterCategory || course.categoryId === filterCategory;
+      const matchesStatus = !filterStatus || course.status === filterStatus;
       const matchesSearch = !searchTerm ||
         course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (categories.find(c => c.id === course.categoryId)?.name.toLowerCase().includes(searchTerm.toLowerCase()));
-      return matchesCategory && matchesSearch;
+        (categories.find(c => c.id === course.categoryId)?.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (course.instructor?.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesCategory && matchesStatus && matchesSearch;
     });
-  }, [courses, filterCategory, searchTerm, categories]);
+  }, [courses, filterCategory, filterStatus, searchTerm, categories]);
 
   const handleAddCourse = () => {
     setSelectedCourse(null);
@@ -101,11 +155,52 @@ const CourseManagement: React.FC = () => {
     setSelectedCompanies(course.assignedTo || []);
     setShowAssignModal(true);
   };
-
   const handleDeleteCourse = async (courseId: string) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce cours ?')) {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce cours ? Cette action supprimera également tous les chapitres, sections et blocs de contenu associés.')) {
       try {
-        await deleteDoc(doc(db, 'courses', courseId));
+        await courseService.deleteCourse(courseId);
+
+        // Recharger les cours après suppression
+        const coursesData = await courseService.getAllCourses();
+        const instructorsData = await instructorService.getAllInstructors();
+
+        const coursesWithStats = await Promise.all(
+          coursesData.map(async (course) => {
+            const enrichedCourse: CourseWithStats = { ...course };
+
+            if (course.instructorId) {
+              const instructor = instructorsData.find(inst => inst.id === course.instructorId);
+              if (instructor) {
+                enrichedCourse.instructor = {
+                  id: instructor.id,
+                  name: instructor.name,
+                  title: instructor.title,
+                  photoUrl: instructor.photoUrl
+                };
+              }
+            }
+
+            try {
+              const [chaptersSnapshot, sectionsSnapshot, blocksSnapshot] = await Promise.all([
+                getDocs(query(collection(db, 'chapters'), where('courseId', '==', course.id))),
+                getDocs(query(collection(db, 'sections'), where('courseId', '==', course.id))),
+                getDocs(query(collection(db, 'content_blocks'), where('courseId', '==', course.id)))
+              ]);
+
+              enrichedCourse.chapterCount = chaptersSnapshot.size;
+              enrichedCourse.sectionCount = sectionsSnapshot.size;
+              enrichedCourse.contentBlockCount = blocksSnapshot.size;
+            } catch (error) {
+              enrichedCourse.chapterCount = 0;
+              enrichedCourse.sectionCount = 0;
+              enrichedCourse.contentBlockCount = 0;
+            }
+
+            return enrichedCourse;
+          })
+        );
+
+        setCourses(coursesWithStats);
         success('Cours supprimé avec succès');
       } catch (error) {
         console.error('Error deleting course:', error);
@@ -144,6 +239,7 @@ const CourseManagement: React.FC = () => {
   // Utilitaire pour obtenir le nom de la catégorie
   const getCategoryName = (categoryId: string) => {
     const cat = categories.find(c => c.id === categoryId);
+    console.log('comparing ', cat);
     return cat ? cat.name : categoryId;
   };
 
@@ -173,9 +269,8 @@ const CourseManagement: React.FC = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
-
   const getCategoryColor = (category: string) => {
-    const colors = {
+    const colors: { [key: string]: string } = {
       'informatique': 'bg-blue-100 text-blue-800',
       'droits humains': 'bg-purple-100 text-purple-800',
       'justice transitionnelle': 'bg-indigo-100 text-indigo-800',
@@ -202,10 +297,32 @@ const CourseManagement: React.FC = () => {
         return '📚';
     }
   };
-
   const clearFilters = () => {
     setFilterCategory('');
+    setFilterStatus('');
     setSearchTerm('');
+  };
+
+  const getStatusColor = (status?: string) => {
+    switch (status) {
+      case 'published':
+        return 'bg-green-100 text-green-800';
+      case 'draft':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'published':
+        return 'Publié';
+      case 'draft':
+        return 'Brouillon';
+      default:
+        return 'Non défini';
+    }
   };
 
   if (loading) {
@@ -237,21 +354,20 @@ const CourseManagement: React.FC = () => {
 
       {/* Filters */}
       <Card>
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-5 w-5 text-gray-500" />
-            <h3 className="text-lg font-semibold text-gray-900">Filtres</h3>
-            {(filterCategory || searchTerm) && (
-              <button
-                onClick={clearFilters}
-                className="ml-auto text-sm text-red-600 hover:text-red-800 underline"
-              >
-                Effacer les filtres
-              </button>
-            )}
-          </div>
+        <div className="p-6">          <div className="flex items-center gap-2 mb-4">
+          <Filter className="h-5 w-5 text-gray-500" />
+          <h3 className="text-lg font-semibold text-gray-900">Filtres</h3>
+          {(filterCategory || filterStatus || searchTerm) && (
+            <button
+              onClick={clearFilters}
+              className="ml-auto text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Effacer les filtres
+            </button>
+          )}
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -262,9 +378,7 @@ const CourseManagement: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               />
-            </div>
-
-            {/* Category filter */}
+            </div>            {/* Category filter */}
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
@@ -277,10 +391,21 @@ const CourseManagement: React.FC = () => {
                 </option>
               ))}
             </select>
+
+            {/* Status filter */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            >
+              <option value="">Tous les statuts</option>
+              <option value="draft">Brouillon</option>
+              <option value="published">Publié</option>
+            </select>
           </div>
 
           {/* Active filter indicators */}
-          {(filterCategory || searchTerm) && (
+          {(filterCategory || filterStatus || searchTerm) && (
             <div className="flex flex-wrap gap-2 mt-4">
               {searchTerm && (
                 <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
@@ -292,13 +417,23 @@ const CourseManagement: React.FC = () => {
                     <X className="h-3 w-3" />
                   </button>
                 </span>
-              )}
-              {filterCategory && (
+              )}              {filterCategory && (
                 <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
                   Catégorie: {getCategoryName(filterCategory)}
                   <button
                     onClick={() => setFilterCategory('')}
                     className="hover:bg-blue-200 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {filterStatus && (
+                <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                  Statut: {getStatusLabel(filterStatus)}
+                  <button
+                    onClick={() => setFilterStatus('')}
+                    className="hover:bg-purple-200 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -364,121 +499,231 @@ const CourseManagement: React.FC = () => {
             )}
           </div>
         </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCourses.map((course) => (
-            <div
-              key={course.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
-            >
-              {/* Course Header */}
-              <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 text-white">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="text-4xl">
-                    {getCategoryIcon(getCategoryName(course.categoryId))}
-                  </div>
+      ) : (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredCourses.map((course) => (
+          <div
+            key={course.id}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group"
+          >
+            {/* Course Header */}
+            <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 text-white relative overflow-hidden">
+              <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+              <div className="flex items-start justify-between mb-4 relative z-10">
+                <div className="text-4xl">
+                  {getCategoryIcon(getCategoryName(course.categoryId))}
+                </div>
+                <div className="flex flex-col gap-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getLevelColor(course.level)} bg-white/20 text-white`}>
                     {course.level}
                   </span>
-                </div>
-                <h3 className="text-xl font-bold mb-2 line-clamp-2">
-                  {course.title}
-                </h3>
-
-                {/* Category and subcategory */}
-                <div className="flex flex-wrap gap-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(getCategoryName(course.categoryId))} bg-white/90`}>
-                    {getCategoryName(course.categoryId)}
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(course.status)} bg-white/20 text-white`}>
+                    {getStatusLabel(course.status)}
                   </span>
                 </div>
               </div>
 
-              {/* Course Content */}
-              <div className="p-6">
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                  {course.description}
-                </p>
+              <h3 className="text-xl font-bold mb-2 line-clamp-2 relative z-10">
+                {course.title}
+              </h3>
 
-                {/* Stats */}
-                <div className="flex items-center gap-4 mb-4 text-sm text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    {course.duration}h
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    {course.assignedTo?.length || 0} entreprises
-                  </div>
-                </div>
-
-                {/* Assigned Companies */}
-                {course.assignedTo && course.assignedTo.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs font-medium text-gray-500 mb-2">Affecté à :</p>
-                    <div className="flex flex-wrap gap-2">
-                      {course.assignedTo.slice(0, 3).map(companyId => (
-                        <div
-                          key={companyId}
-                          className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs"
-                        >
-                          <Building2 className="h-3 w-3" />
-                          {getCompanyName(companyId)}
-                        </div>
-                      ))}
-                      {course.assignedTo.length > 3 && (
-                        <span className="text-xs text-gray-500 px-2 py-1">
-                          +{course.assignedTo.length - 3} autres
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleEditCourse(course)}
-                    variant="outlined"
-                    size="sm"
-                    leftIcon={<Edit2 className="h-4 w-4" />}
-                    className="flex-1"
-                  >
-                    Modifier
-                  </Button>
-                  <Button
-                    onClick={() => handleAssignCourse(course)}
-                    variant="outlined"
-                    size="sm"
-                    leftIcon={<Building2 className="h-4 w-4" />}
-                    className="flex-1"
-                  >
-                    Affecter
-                  </Button>
-                  <Button
-                    onClick={() => handleDeleteCourse(course.id)}
-                    variant="error"
-                    size="sm"
-                    leftIcon={<Trash2 className="h-4 w-4" />}
-                  >
-                    Supprimer
-                  </Button>
-                </div>
+              {/* Category */}
+              <div className="flex flex-wrap gap-2 relative z-10">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(getCategoryName(course.categoryId))} bg-white/90`}>
+                  {getCategoryName(course.categoryId)}
+                </span>
               </div>
             </div>
-          ))}
-        </div>
+
+            {/* Course Content */}
+            <div className="p-6">
+              <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                {course.description}
+              </p>
+
+              {/* Instructor Info */}
+              {course.instructor && (
+                <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                  {course.instructor.photoUrl ? (
+                    <img
+                      src={course.instructor.photoUrl}
+                      alt={course.instructor.name}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-gray-500" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {course.instructor.name}
+                    </p>
+                    {course.instructor.title && (
+                      <p className="text-xs text-gray-500 truncate">
+                        {course.instructor.title}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Course Statistics */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Clock className="h-4 w-4" />
+                  <span>{course.duration}h</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Users className="h-4 w-4" />
+                  <span>{course.assignedTo?.length || 0} entreprises</span>
+                </div>
+                {course.videoUrl && (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <Play className="h-4 w-4" />
+                    <span>Vidéo intro</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Calendar className="h-4 w-4" />
+                  <span>{new Date(course.createdAt?.toDate?.() || course.createdAt).toLocaleDateString('fr-FR')}</span>
+                </div>
+              </div>
+
+              {/* Content Structure Stats */}
+              {(course.chapterCount !== undefined || course.sectionCount !== undefined || course.contentBlockCount !== undefined) && (
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                  <h4 className="text-xs font-medium text-blue-800 mb-2">Structure du cours</h4>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center">
+                      <div className="font-semibold text-blue-900">{course.chapterCount || 0}</div>
+                      <div className="text-blue-600">Chapitres</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-semibold text-blue-900">{course.sectionCount || 0}</div>
+                      <div className="text-blue-600">Sections</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-semibold text-blue-900">{course.contentBlockCount || 0}</div>
+                      <div className="text-blue-600">Blocs</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Assigned Companies */}
+              {course.assignedTo && course.assignedTo.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Affecté à :</p>
+                  <div className="flex flex-wrap gap-2">
+                    {course.assignedTo.slice(0, 2).map(companyId => (
+                      <div
+                        key={companyId}
+                        className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs"
+                      >
+                        <Building2 className="h-3 w-3" />
+                        {getCompanyName(companyId)}
+                      </div>
+                    ))}
+                    {course.assignedTo.length > 2 && (
+                      <span className="text-xs text-gray-500 px-2 py-1">
+                        +{course.assignedTo.length - 2} autres
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleEditCourse(course)}
+                  variant="outlined"
+                  size="sm"
+                  leftIcon={<Edit2 className="h-4 w-4" />}
+                  className="flex-1"
+                >
+                  Modifier
+                </Button>
+                <Button
+                  onClick={() => handleAssignCourse(course)}
+                  variant="outlined"
+                  size="sm"
+                  leftIcon={<Building2 className="h-4 w-4" />}
+                  className="flex-1"
+                >
+                  Affecter
+                </Button>
+                <Button
+                  onClick={() => handleDeleteCourse(course.id)}
+                  variant="error"
+                  size="sm"
+                  leftIcon={<Trash2 className="h-4 w-4" />}
+                >
+                  Supprimer
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
       )}
 
       {/* Course Form Modal */}
-      {showForm && (
-        <CourseForm
-          course={selectedCourse}
-          onClose={() => setShowForm(false)}
-          onSave={() => {
-            setShowForm(false);
-            success(selectedCourse ? 'Cours mis à jour avec succès' : 'Cours créé avec succès');
-          }}
-        />
+      {showForm && (<CourseForm
+        course={selectedCourse}
+        onClose={() => setShowForm(false)}
+        onSave={async () => {
+          setShowForm(false);
+
+          // Recharger les cours avec les nouvelles données
+          try {
+            const coursesData = await courseService.getAllCourses();
+            const instructorsData = await instructorService.getAllInstructors();
+
+            const coursesWithStats = await Promise.all(
+              coursesData.map(async (course) => {
+                const enrichedCourse: CourseWithStats = { ...course };
+
+                if (course.instructorId) {
+                  const instructor = instructorsData.find(inst => inst.id === course.instructorId);
+                  if (instructor) {
+                    enrichedCourse.instructor = {
+                      id: instructor.id,
+                      name: instructor.name,
+                      title: instructor.title,
+                      photoUrl: instructor.photoUrl
+                    };
+                  }
+                }
+
+                try {
+                  const [chaptersSnapshot, sectionsSnapshot, blocksSnapshot] = await Promise.all([
+                    getDocs(query(collection(db, 'chapters'), where('courseId', '==', course.id))),
+                    getDocs(query(collection(db, 'sections'), where('courseId', '==', course.id))),
+                    getDocs(query(collection(db, 'content_blocks'), where('courseId', '==', course.id)))
+                  ]);
+
+                  enrichedCourse.chapterCount = chaptersSnapshot.size;
+                  enrichedCourse.sectionCount = sectionsSnapshot.size;
+                  enrichedCourse.contentBlockCount = blocksSnapshot.size;
+                } catch (error) {
+                  enrichedCourse.chapterCount = 0;
+                  enrichedCourse.sectionCount = 0;
+                  enrichedCourse.contentBlockCount = 0;
+                }
+
+                return enrichedCourse;
+              })
+            );
+            setCourses(coursesWithStats);
+          } catch (error) {
+            console.error('Error reloading courses:', error);
+          }
+
+          success(selectedCourse ? 'Cours mis à jour avec succès' : 'Cours créé avec succès');
+        }}
+      />
       )}
 
       {/* Assignment Modal */}
@@ -538,14 +783,15 @@ const CourseManagement: React.FC = () => {
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">
                           {getCompanyInitials(company.name)}
-                        </div>
-                        <div>
+                        </div>                        <div>
                           <h4 className="font-medium text-gray-900">
                             {company.name}
                           </h4>
-                          <p className="text-sm text-gray-500">
-                            {company.email}
-                          </p>
+                          {company.email && (
+                            <p className="text-sm text-gray-500">
+                              {company.email}
+                            </p>
+                          )}
                         </div>
                       </div>
 

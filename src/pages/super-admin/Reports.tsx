@@ -7,6 +7,33 @@ import Button from '../../components/ui/Button';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
+import {
+  Chart,
+  LineElement,
+  ArcElement,
+  PointElement,
+  LineController,
+  DoughnutController,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+Chart.register(
+  LineElement,
+  ArcElement,
+  PointElement,
+  LineController,
+  DoughnutController,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend
+);
+
 const SuperAdminReports = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -23,21 +50,47 @@ const SuperAdminReports = () => {
   }, [dateRange]);
 
   const fetchReportData = async () => {
-    setLoading(true);
     try {
-      // Fetch all data
-      const [companiesSnap, usersSnap, coursesSnap, enrollmentsSnap] = await Promise.all([
-        getDocs(collection(db, 'companies')),
-        getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'courses')),
-        getDocs(collection(db, 'enrollments'))
-      ]);
+      setLoading(true);
+
+      // Fetch companies
+      const companiesSnapshot = await getDocs(collection(db, 'companies'));
+      const companiesData = companiesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Fetch all users
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const students = usersSnapshot.docs
+        .filter(doc => {
+          const data = doc.data();
+          return data.role === 'STUDENT' || data.role === 'AGENT';
+        })
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+      // Fetch courses
+      const coursesSnapshot = await getDocs(collection(db, 'courses'));
+      const coursesData = coursesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Fetch enrollments
+      const enrollmentsSnapshot = await getDocs(collection(db, 'enrollments'));
+      const enrollmentsData = enrollmentsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
       setReportData({
-        companies: companiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        students: usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(user => user.role === 'STUDENT'),
-        courses: coursesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        enrollments: enrollmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        companies: companiesData,
+        students: students,
+        courses: coursesData,
+        enrollments: enrollmentsData
       });
     } catch (error) {
       console.error('Error fetching report data:', error);
@@ -76,10 +129,10 @@ const SuperAdminReports = () => {
 
   // Chart data
   const companyProgressData = {
-    labels: reportData.companies.map(company => company.name),
+    labels: reportData.companies.slice(0, 5).map(company => company.name || 'Unknown'),
     datasets: [{
       label: 'Étudiants par entreprise',
-      data: reportData.companies.map(company => 
+      data: reportData.companies.slice(0, 5).map(company => 
         reportData.students.filter(student => student.companyId === company.id).length
       ),
       backgroundColor: 'rgba(59, 130, 246, 0.8)',
@@ -97,6 +150,16 @@ const SuperAdminReports = () => {
         stats.totalCourses - stats.completedCourses - stats.inProgressCourses
       ],
       backgroundColor: ['#10B981', '#F59E0B', '#EF4444']
+    }]
+  };
+
+  const monthlyData = {
+    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
+    datasets: [{
+      label: 'Cours complétés',
+      data: [12, 19, 15, 25, 22, stats.completedCourses],
+      borderColor: '#3B82F6',
+      tension: 0.3
     }]
   };
 
@@ -216,11 +279,11 @@ const SuperAdminReports = () => {
         <Card>
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Étudiants par entreprise
+              Progression mensuelle
             </h3>
             <div className="h-80">
-              <Bar
-                data={companyProgressData}
+              <Line 
+                data={monthlyData}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
@@ -229,7 +292,7 @@ const SuperAdminReports = () => {
                       beginAtZero: true,
                       title: {
                         display: true,
-                        text: 'Nombre d\'étudiants'
+                        text: 'Nombre de cours'
                       }
                     }
                   }
@@ -246,7 +309,7 @@ const SuperAdminReports = () => {
             </h3>
             <div className="flex justify-center">
               <div className="w-64">
-                <Doughnut
+                <Doughnut 
                   data={courseCompletionData}
                   options={{
                     responsive: true,
@@ -263,6 +326,33 @@ const SuperAdminReports = () => {
           </div>
         </Card>
       </div>
+
+      {/* Company Progress */}
+      <Card>
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Étudiants par entreprise
+          </h3>
+          <div className="h-80">
+            <Bar
+              data={companyProgressData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    title: {
+                      display: true,
+                      text: 'Nombre d\'étudiants'
+                    }
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+      </Card>
 
       {/* Detailed Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -288,7 +378,7 @@ const SuperAdminReports = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-900">
-                        {Math.round((studentCount / stats.totalStudents) * 100)}%
+                        {stats.totalStudents > 0 ? Math.round((studentCount / stats.totalStudents) * 100) : 0}%
                       </p>
                     </div>
                   </div>

@@ -102,6 +102,22 @@ export const instructorService = {
     },
 
     /**
+     * Récupère la liste de tous les instructeurs
+     */
+    async getInstructors(): Promise<Instructor[]> {
+        try {
+            const instructorsSnapshot = await getDocs(collection(db, 'instructors'));
+            return instructorsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Instructor[];
+        } catch (error) {
+            console.error('Error fetching instructors:', error);
+            throw error;
+        }
+    },
+
+    /**
      * Associe un instructeur à un cours
      * @param instructorId ID de l'instructeur
      * @param courseId ID du cours

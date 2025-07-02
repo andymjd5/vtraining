@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import Button from '../components/ui/Button';
 
 const About = () => {
   return (
@@ -131,6 +133,21 @@ const About = () => {
             <button className="bg-gray-800 text-white font-bold py-3 px-8 rounded hover:bg-gray-700 transition duration-300 shadow-lg transform hover:scale-105">
               S'identifier maintenant
             </button>
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Get Started</h2>
+            <p className="text-gray-700 mb-4">
+              Ready to transform your organization's learning experience? Contact us 
+              to learn more about how we can help you achieve your training goals.
+            </p>
+            <Link to="/login">
+              <Button 
+                size="lg" 
+                variant="primary"
+                className="mt-2"
+              >
+                Sign in now
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

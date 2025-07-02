@@ -87,11 +87,11 @@ export interface ContentBlock {
     sectionId: string;
     chapterId: string;
     courseId: string;
-    type: 'text' | 'image' | 'video' | 'file' | 'code' | 'embed';
-    content: string;
+    type: 'text' | 'media' | 'file' | 'code' | 'embed'; // Simplifié - approche media unifiée
+    content: string; // Pour text, code, embed, file (URL/path)
     order: number;
-    formatting?: TextFormatting;
-    media?: MediaItem;
+    formatting?: TextFormatting; // Seulement pour type 'text'
+    media?: MediaItem; // Pour type 'media' uniquement
     createdAt: any;
     updatedAt: any;
 }
@@ -107,15 +107,18 @@ export interface TextFormatting {
 }
 
 /**
- * Item média (image ou vidéo)
+ * Item média (image, vidéo ou audio)
  */
 export interface MediaItem {
     id: string;
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'audio'; // Ajout d'audio
     url: string;
     alignment?: 'left' | 'center' | 'right';
     caption?: string;
     thumbnailUrl?: string;        // URL de miniature pour les vidéos
+    duration?: number;            // Durée en secondes pour video/audio
+    fileSize?: number;            // Taille du fichier en bytes
+    mimeType?: string;            // Type MIME du fichier
 }
 
 /**
