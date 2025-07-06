@@ -54,6 +54,8 @@ interface UserProgress {
   timeSpent: number; // temps total passé en minutes
   lastContentBlockId: string | null;
   contentBlocksTimeSpent: { [blockId: string]: number }; // temps par bloc
+  completedQuizzes?: string[]; // IDs des quiz complétés
+  quizScores?: { [quizId: string]: number }; // Scores des quiz par ID
 }
 
 const toast = {
@@ -201,6 +203,22 @@ export default function CourseView() {
     return blockIds;
   };
 
+  // ✅ Vérifier si tous les blocs de contenu d'un chapitre sont terminés
+  const isChapterContentCompleted = (chapterId: string): boolean => {
+    if (!userProgress) return false;
+    const chapterBlocks = getAllContentBlocksForChapter(chapterId);
+    if (chapterBlocks.length === 0) return true; // Un chapitre sans contenu est considéré comme "terminé"
+    return chapterBlocks.every(blockId =>
+      userProgress.completedContentBlocks?.includes(blockId)
+    );
+  };
+
+  // ✅ Vérifier si le quiz d'un chapitre a été complété
+  const isQuizCompleted = (chapterId: string): boolean => {
+    if (!userProgress?.completedQuizzes) return false;
+    return userProgress.completedQuizzes.includes(chapterId);
+  };
+
   // 🕒 Fonctions de tracking du temps réel
   const startContentBlockTimer = (blockId: string) => {
     // Arrêter le timer précédent si il y en a un
@@ -342,7 +360,6 @@ export default function CourseView() {
       }
     }
   };
-
   const goToNextSection = () => {
     if (!course?.chapters || !currentChapter || !currentSection) return;
 
@@ -350,6 +367,16 @@ export default function CourseView() {
     const currentSectionIndex = currentChapter.sections.findIndex(
       section => section.id === currentSection.id
     );
+
+    // Vérifier si c'est la dernière section du chapitre et si le chapitre a un quiz
+    const isLastSectionOfChapter = currentSectionIndex === currentChapter.sections.length - 1;
+
+    // Si c'est la dernière section et que tous les blocs de contenu sont terminés et qu'il y a un quiz
+    if (isLastSectionOfChapter && isChapterContentCompleted(currentChapter.id) && currentChapter.hasQuiz) {
+      // Rediriger vers le quiz du chapitre
+      startQuiz(currentChapter.id);
+      return;
+    }
 
     // S'il y a une section suivante dans le même chapitre
     if (currentSectionIndex < currentChapter.sections.length - 1) {
@@ -382,10 +409,30 @@ export default function CourseView() {
   const hasPreviousChapter = () => {
     return getCurrentChapterIndex() > 0;
   };
-
   const hasNextChapter = () => {
     const currentIndex = getCurrentChapterIndex();
     return currentIndex >= 0 && currentIndex < (course?.chapters?.length || 0) - 1;
+  };
+  // 🎮 Fonction pour démarrer le quiz d'un chapitre
+  const startQuiz = (chapterId: string) => {
+    if (!courseId || !user) return;
+
+    // Stopper le timer du bloc de contenu actuel
+    stopContentBlockTimer();
+
+    // Sauvegarder l'état de progression actuel
+    if (userProgress) {
+      const updatedProgress = {
+        ...userProgress,
+        lastAccessedAt: new Date()
+      };
+      setDoc(doc(db, 'userProgress', `${user.uid}_${courseId}`), updatedProgress);
+    }
+
+    // Rediriger vers la page de quiz avec les paramètres nécessaires
+    navigate(`/student/quiz/${courseId}?chapterId=${chapterId}`);
+
+    toast.success(`Lancement du quiz pour le chapitre: ${currentChapter?.title}`);
   };
 
   // Fonctions pour vérifier s'il y a une section précédente ou suivante (incluant entre chapitres)
@@ -482,8 +529,7 @@ export default function CourseView() {
             }
           }
         }
-      } else {
-        // Initialiser les progrès
+      } else {        // Initialiser les progrès
         const initialProgress: UserProgress = {
           courseId: courseId,
           completedChapters: [],
@@ -494,7 +540,9 @@ export default function CourseView() {
           lastAccessedAt: new Date(),
           timeSpent: 0,
           lastContentBlockId: null,
-          contentBlocksTimeSpent: {}
+          contentBlocksTimeSpent: {},
+          completedQuizzes: [],
+          quizScores: {}
         };
 
         // Sauvegarder les progrès initiaux
@@ -531,7 +579,7 @@ export default function CourseView() {
       // Calculer le pourcentage de progression basé sur les blocs de contenu
       const totalContentBlocks = progressStats?.totalContentBlocks || 1;
       const progressPercentage = Math.round(
-        (updatedCompletedContentBlocks.length / totalContentBlocks) * 100
+        (updatedCompletedContentBlocks.length / totalContentBlocks) + 100
       );
 
       const updatedProgress: UserProgress = {
@@ -1074,9 +1122,7 @@ export default function CourseView() {
                             </div>
                           </div>
                         </div>
-                      )}
-
-                      {/* Navigation entre sections (en fin de section) */}
+                      )}                      {/* Navigation entre sections (en fin de section) */}
                       <div className="flex justify-between mt-8 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200">
                         <Button
                           variant="outlined"
@@ -1087,15 +1133,44 @@ export default function CourseView() {
                           <ArrowLeft className="h-4 w-4 mr-1" />
                           <span>Section précédente</span>
                         </Button>
-
-                        <Button
-                          variant="outlined"
-                          onClick={goToNextSection}
-                          disabled={!hasNextSection()}
-                          className="bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl px-5 py-2 transition-all duration-200 flex items-center space-x-2"
-                        >                          <span>Section suivante</span>
-                          <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
+                        {/* Bouton Quiz Conditionnel: Afficher uniquement si c'est la dernière section du chapitre, 
+                            que tout le contenu est terminé, et qu'il y a un quiz dans ce chapitre */}
+                        {currentSection &&
+                          currentChapter &&
+                          currentChapter.hasQuiz &&
+                          currentChapter.sections.findIndex(s => s.id === currentSection.id) === currentChapter.sections.length - 1 &&
+                          isChapterContentCompleted(currentChapter.id) ? (
+                          <Button
+                            variant="contained"
+                            onClick={() => startQuiz(currentChapter.id)}
+                            className={`${isQuizCompleted(currentChapter.id)
+                              ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+                              : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'} 
+                              text-white rounded-xl px-6 py-2 transition-all duration-200 flex items-center space-x-2`}
+                          >
+                            {isQuizCompleted(currentChapter.id) ? (
+                              <>
+                                <span>Refaire le Quiz</span>
+                                <CheckCircle className="h-4 w-4 ml-2" />
+                              </>
+                            ) : (
+                              <>
+                                <span>Commencer le Quiz</span>
+                                <GraduationCap className="h-4 w-4 ml-2" />
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outlined"
+                            onClick={goToNextSection}
+                            disabled={!hasNextSection()}
+                            className="bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl px-5 py-2 transition-all duration-200 flex items-center space-x-2"
+                          >
+                            <span>Section suivante</span>
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1277,11 +1352,17 @@ export default function CourseView() {
                                         <Clock className="h-3 w-3 mr-1" />
                                         {chapter.estimatedTime}min
                                       </span>
-                                    )}
-                                    <span className="flex items-center text-xs text-gray-500">
+                                    )}                                    <span className="flex items-center text-xs text-gray-500">
                                       <FileText className="h-3 w-3 mr-1" />
                                       {completedSections}/{chapter.sections.length} sections
                                     </span>
+                                    {chapter.hasQuiz && (
+                                      <span className={`flex items-center text-xs ${isQuizCompleted(chapter.id) ? 'text-green-500' : 'text-gray-500'
+                                        }`}>
+                                        <GraduationCap className="h-3 w-3 mr-1" />
+                                        Quiz {isQuizCompleted(chapter.id) ? 'complété' : ''}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
