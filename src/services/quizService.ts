@@ -560,12 +560,13 @@ export const quizService = {
       throw error;
     }
   },  /**
-   * Démarre une session de quiz (gère les deux modes)
-   * @param userId ID de l'utilisateur (pour futurs logs)
+   * Démarre une session de quiz (gère les deux modes et les tentatives multiples)
+   * @param userId ID de l'utilisateur
    * @param chapterId ID du chapitre
    * @param courseId ID du cours
+   * @param isRetry Indique s'il s'agit d'une nouvelle tentative (true) ou d'une première tentative (false)
    */
-  async startQuizSession(userId: string, chapterId: string, courseId: string): Promise<QuizQuestion[]> {
+  async startQuizSession(userId: string, chapterId: string, courseId: string, isRetry: boolean = false): Promise<QuizQuestion[]> {
     try {
       // Récupérer les paramètres du quiz
       const chapterDoc = await getDoc(doc(db, 'chapters', chapterId));
@@ -580,13 +581,13 @@ export const quizService = {
         throw new Error('Paramètres de quiz non configurés pour ce chapitre');
       }
 
-      console.log(`Démarrage session quiz pour utilisateur ${userId}, mode: ${settings.generationMode}`);
+      console.log(`Démarrage session quiz pour utilisateur ${userId}, mode: ${settings.generationMode}, tentative: ${isRetry ? 'nouvelle' : 'première'}`);
 
       if (settings.generationMode === 'pool') {
-        // Mode banque de questions : piocher au hasard
-        return await this.getRandomQuestionsFromPool(chapterId, settings.questionCount, settings.isRandomized);
+        // Mode banque de questions : éviter les questions déjà vues lors des tentatives précédentes
+        return await this.getQuestionsFromPoolWithRetryLogic(userId, chapterId, settings.questionCount, settings.isRandomized, isRetry);
       } else {
-        // Mode à la volée : générer des questions uniques
+        // Mode à la volée : générer des questions complètement différentes
         if (!isAIConfigured()) {
           throw new Error('Configuration API IA manquante pour le mode "à la volée"');
         }
@@ -594,9 +595,14 @@ export const quizService = {
         const content = await this.getChapterContent(chapterId);
         if (!content.trim()) {
           throw new Error('Aucun contenu trouvé pour ce chapitre');
-        }
-
-        const generatedQuestions = await this.generateQuestionsForAI(content, settings.questionCount);
+        }        // Pour les tentatives multiples, ajouter un contexte spécifique pour éviter la répétition
+        const generatedQuestions = await this.generateQuestionsForAIWithRetryLogic(
+          content,
+          settings.questionCount,
+          userId,
+          chapterId,
+          isRetry
+        );
 
         // Convertir en QuizQuestion complètes avec des IDs temporaires
         return generatedQuestions.map((q, index) => ({
@@ -614,11 +620,16 @@ export const quizService = {
       throw error;
     }
   },
-
   /**
-   * Récupère des questions aléatoirement depuis la banque
+   * Récupère des questions depuis la banque en évitant celles déjà vues lors des tentatives précédentes
    */
-  async getRandomQuestionsFromPool(chapterId: string, count: number, randomize: boolean): Promise<QuizQuestion[]> {
+  async getQuestionsFromPoolWithRetryLogic(
+    userId: string,
+    chapterId: string,
+    count: number,
+    randomize: boolean,
+    isRetry: boolean
+  ): Promise<QuizQuestion[]> {
     try {
       const questionsQuery = query(
         collection(db, 'quiz_questions'),
@@ -635,18 +646,81 @@ export const quizService = {
         throw new Error('Aucune question trouvée dans la banque pour ce chapitre');
       }
 
-      // Mélanger et prendre le nombre demandé
       let selectedQuestions = allQuestions;
+
+      // Si c'est une nouvelle tentative, exclure les questions déjà vues
+      if (isRetry) {
+        const previouslyAskedQuestionIds = await this.getPreviouslyAskedQuestionIds(userId, chapterId);
+
+        // Filtrer les questions non vues
+        const unseenQuestions = allQuestions.filter(q => !previouslyAskedQuestionIds.includes(q.id));
+
+        console.log(`Questions dans la banque: ${allQuestions.length}, déjà vues: ${previouslyAskedQuestionIds.length}, nouvelles: ${unseenQuestions.length}`);
+
+        if (unseenQuestions.length >= count) {
+          // Assez de nouvelles questions disponibles
+          selectedQuestions = unseenQuestions;
+        } else if (unseenQuestions.length > 0) {
+          // Pas assez de nouvelles questions, utiliser ce qui est disponible + quelques anciennes
+          const remainingCount = count - unseenQuestions.length;
+          const oldQuestions = allQuestions.filter(q => previouslyAskedQuestionIds.includes(q.id));
+
+          selectedQuestions = [
+            ...unseenQuestions,
+            ...this.shuffleArray(oldQuestions).slice(0, remainingCount)
+          ];
+
+          console.log(`Utilisation de ${unseenQuestions.length} nouvelles questions et ${remainingCount} anciennes`);
+        } else {
+          // Toutes les questions ont été vues, utiliser toutes les questions mais mélangées différemment
+          selectedQuestions = allQuestions;
+          console.log('Toutes les questions ont été vues, nouveau mélange complet');
+        }
+      }
+
+      // Mélanger et prendre le nombre demandé
       if (randomize) {
-        selectedQuestions = this.shuffleArray([...allQuestions]);
+        selectedQuestions = this.shuffleArray([...selectedQuestions]);
       }
 
       return selectedQuestions.slice(0, Math.min(count, selectedQuestions.length));
     } catch (error) {
-      console.error('Erreur lors de la récupération des questions de la banque:', error);
+      console.error('Erreur lors de la récupération des questions de la banque avec logique de retry:', error);
       throw error;
     }
-  },  /**
+  },
+
+  /**
+   * Récupère les IDs des questions déjà posées à un utilisateur pour un chapitre
+   */
+  async getPreviouslyAskedQuestionIds(userId: string, chapterId: string): Promise<string[]> {
+    try {
+      const attemptsQuery = query(
+        collection(db, 'quiz_attempts'),
+        where('userId', '==', userId),
+        where('chapterId', '==', chapterId)
+      );
+
+      const attemptsSnapshot = await getDocs(attemptsQuery);
+      const questionIds = new Set<string>(); attemptsSnapshot.docs.forEach(doc => {
+        const attempt = doc.data() as QuizAttempt;
+        if (attempt.questionsAsked) {
+          attempt.questionsAsked.forEach((q: any) => {
+            // Pour les questions de la banque, on peut extraire l'ID s'il existe
+            // Note: Les questions générées par IA n'ont pas d'ID fixe
+            if (q.id && !q.id.startsWith('temp-')) {
+              questionIds.add(q.id);
+            }
+          });
+        }
+      });
+
+      return Array.from(questionIds);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des questions précédentes:', error);
+      return [];
+    }
+  },/**
    * Génère des questions avec l'IA (utilise le nouveau service multi-provider)
    */
   async generateQuestionsForAI(content: string, questionCount: number): Promise<Omit<QuizQuestion, 'id' | 'chapterId' | 'createdAt' | 'updatedAt'>[]> {
@@ -833,6 +907,90 @@ Important:
     } catch (error) {
       console.error('Erreur lors de la sauvegarde de la tentative:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Génère des questions avec l'IA en tenant compte des tentatives précédentes
+   */
+  async generateQuestionsForAIWithRetryLogic(
+    content: string,
+    questionCount: number,
+    userId: string,
+    chapterId: string,
+    isRetry: boolean
+  ): Promise<Omit<QuizQuestion, 'id' | 'chapterId' | 'createdAt' | 'updatedAt'>[]> {
+    try {
+      let enhancedPrompt = content;
+
+      if (isRetry) {
+        // Pour les tentatives multiples, ajouter des instructions spécifiques pour éviter la répétition
+        const previousTopics = await this.getPreviousQuestionTopics(userId, chapterId);
+
+        if (previousTopics.length > 0) {
+          enhancedPrompt += `\n\nIMPORTANT: Cette personne a déjà passé ce quiz. Évitez de poser des questions sur ces sujets déjà abordés: ${previousTopics.join(', ')}. 
+          Concentrez-vous sur d'autres aspects du contenu ou posez des questions sous un angle différent.`;
+        }
+
+        enhancedPrompt += `\n\nGénérez des questions DIFFÉRENTES de celles potentiellement posées précédemment. Variez les angles d'approche et les aspects du contenu.`;
+      }      // Utiliser le service IA existant avec le contenu enrichi
+      const generatedQuestions = await aiService.generateQuizQuestions(enhancedPrompt, questionCount, {
+        difficulty: 'medium',
+        language: 'français',
+        customInstructions: isRetry ? 'Générez des questions complètement différentes en explorant d\'autres aspects du contenu.' : ''
+      });
+
+      // Convertir au format QuizQuestion
+      return generatedQuestions.map(q => ({
+        courseId: '',
+        question: q.question,
+        options: q.options,
+        answer: q.answer,
+        explanation: q.explanation,
+        difficulty: q.difficulty,
+        generatedByAI: true
+      }));
+
+    } catch (error) {
+      console.error('Erreur lors de la génération IA avec logique de retry:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Extrait les sujets des questions précédemment posées pour éviter la répétition
+   */
+  async getPreviousQuestionTopics(userId: string, chapterId: string): Promise<string[]> {
+    try {
+      const attemptsQuery = query(
+        collection(db, 'quiz_attempts'),
+        where('userId', '==', userId),
+        where('chapterId', '==', chapterId)
+      );
+
+      const attemptsSnapshot = await getDocs(attemptsQuery);
+      const topics = new Set<string>();
+
+      attemptsSnapshot.docs.forEach(doc => {
+        const attempt = doc.data() as QuizAttempt;
+        if (attempt.questionsAsked) {
+          attempt.questionsAsked.forEach((q: any) => {
+            // Extraire des mots-clés simples de la question pour identifier les sujets
+            const questionWords = q.questionText
+              .toLowerCase()
+              .split(' ')
+              .filter((word: string) => word.length > 4) // Mots de plus de 4 caractères
+              .slice(0, 3); // Prendre les 3 premiers mots significatifs
+
+            questionWords.forEach((word: string) => topics.add(word));
+          });
+        }
+      });
+
+      return Array.from(topics);
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction des sujets précédents:', error);
+      return [];
     }
   },
 
