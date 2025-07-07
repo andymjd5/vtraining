@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",
+    "test:ai": "node scripts/test-ai-providers.mjs",
+    "setup:ai": "powershell -ExecutionPolicy Bypass -File scripts/setup-ai-providers.ps1 -Interactive",
     "create-users": "tsx src/scripts/createTestUsers.ts"
   },
   "dependencies": {

@@ -1,12 +1,13 @@
 // src/components/course-editor/ChapterEditor.tsx
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Settings } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical } from 'lucide-react';
 import { ChapterWithSections, SectionWithContent, QuizSettings } from '../../types/course';
 import SectionEditor from './SectionEditor';
 import QuizSettingsEditor from './QuizSettingsEditor';
 
 interface ChapterEditorProps {
     chapter: ChapterWithSections;
+    courseId: string;
     isActive: boolean;
     onChapterClick: (id: string) => void;
     onChapterUpdate: (chapter: ChapterWithSections) => void;
@@ -23,6 +24,7 @@ interface ChapterEditorProps {
 
 const ChapterEditor: React.FC<ChapterEditorProps> = ({
     chapter,
+    courseId,
     isActive,
     onChapterClick,
     onChapterUpdate,
@@ -48,9 +50,7 @@ const ChapterEditor: React.FC<ChapterEditorProps> = ({
             ...chapter,
             description: e.target.value
         });
-    };
-
-    const handleToggleQuiz = (enabled: boolean) => {
+    }; const handleToggleQuiz = (enabled: boolean) => {
         onChapterUpdate({
             ...chapter,
             hasQuiz: enabled,
@@ -61,7 +61,8 @@ const ChapterEditor: React.FC<ChapterEditorProps> = ({
                 questionCount: 5,
                 isRandomized: true,
                 showFeedbackImmediately: false,
-                attemptsAllowed: 3
+                attemptsAllowed: 3,
+                generationMode: 'pool'
             } : chapter.quizSettings
         });
     };
@@ -150,12 +151,11 @@ const ChapterEditor: React.FC<ChapterEditorProps> = ({
                             rows={2}
                             placeholder="Description du chapitre..."
                         />
-                    </div>
-
-                    {/* Quiz Settings Editor */}
+                    </div>                    {/* Quiz Settings Editor */}
                     <div className="mt-4">
                         <QuizSettingsEditor
                             chapterId={chapter.id}
+                            courseId={courseId}
                             hasQuiz={chapter.hasQuiz || false}
                             quizSettings={chapter.quizSettings || null}
                             onToggleQuiz={handleToggleQuiz}

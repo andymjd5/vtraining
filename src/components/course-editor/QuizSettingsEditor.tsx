@@ -1,13 +1,18 @@
 // src/components/course-editor/QuizSettingsEditor.tsx
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
-import { Book, Save, Trash2, Settings, GraduationCap, Clock, Check, Target } from 'lucide-react';
+import { Book, Save, Settings, GraduationCap, Clock, Target } from 'lucide-react';
 import { QuizSettings } from '../../types/course';
 import Switch from '../../components/ui/Switch';
 import Slider from '../../components/ui/Slider';
+import { quizService } from '../../services/quizService';
+import { aiService } from '../../services/aiService';
+import { getCurrentProviderConfig, type AIProvider } from '../../config/ai';
+import AIProviderSelector from '../../components/ui/AIProviderSelector';
 
 interface QuizSettingsEditorProps {
     chapterId: string;
+    courseId: string;
     hasQuiz: boolean;
     quizSettings?: QuizSettings | null;
     onToggleQuiz: (enabled: boolean) => void;
@@ -16,26 +21,25 @@ interface QuizSettingsEditorProps {
 
 const QuizSettingsEditor: React.FC<QuizSettingsEditorProps> = ({
     chapterId,
+    courseId,
     hasQuiz,
     quizSettings,
     onToggleQuiz,
     onSaveSettings
-}) => {
-    // État local pour les paramètres du quiz
+}) => {// État local pour les paramètres du quiz
     const [settings, setSettings] = useState<QuizSettings>({
         passingScore: quizSettings?.passingScore || 60,
         timeLimit: quizSettings?.timeLimit || 15,
         questionCount: quizSettings?.questionCount || 5,
         isRandomized: quizSettings?.isRandomized ?? true,
         showFeedbackImmediately: quizSettings?.showFeedbackImmediately ?? false,
-        attemptsAllowed: quizSettings?.attemptsAllowed || 3
-    });
-    
-    // État pour gérer le chargement et les erreurs
+        attemptsAllowed: quizSettings?.attemptsAllowed || 3,
+        generationMode: quizSettings?.generationMode || 'pool'
+    });    // État pour gérer le chargement et les erreurs
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Mise à jour des paramètres quand quizSettings change
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [currentAIProvider, setCurrentAIProvider] = useState<AIProvider>(aiService.getCurrentProvider());// Mise à jour des paramètres quand quizSettings change
     useEffect(() => {
         if (quizSettings) {
             setSettings({
@@ -44,7 +48,8 @@ const QuizSettingsEditor: React.FC<QuizSettingsEditorProps> = ({
                 questionCount: quizSettings.questionCount || 5,
                 isRandomized: quizSettings.isRandomized ?? true,
                 showFeedbackImmediately: quizSettings.showFeedbackImmediately ?? false,
-                attemptsAllowed: quizSettings.attemptsAllowed || 3
+                attemptsAllowed: quizSettings.attemptsAllowed || 3,
+                generationMode: quizSettings.generationMode || 'pool'
             });
         }
     }, [quizSettings]);
@@ -58,26 +63,48 @@ const QuizSettingsEditor: React.FC<QuizSettingsEditorProps> = ({
         try {
             setIsLoading(true);
             setError(null);
-            
+
             // Simulation d'un délai de sauvegarde (à remplacer par un vrai appel API plus tard)
             await new Promise(resolve => setTimeout(resolve, 500));
-            
+
             // Appelle le callback du parent
             onSaveSettings(settings);
-            
+
             setIsLoading(false);
         } catch (error: any) {
             console.error('Erreur lors de la sauvegarde des paramètres du quiz:', error);
             setError(error.message || "Une erreur est survenue lors de la sauvegarde");
             setIsLoading(false);
         }
-    };
-
-    const handleChange = (field: keyof QuizSettings, value: any) => {
+    }; const handleChange = (field: keyof QuizSettings, value: any) => {
         setSettings(prev => ({
             ...prev,
             [field]: value
         }));
+    }; const handleGenerateQuestions = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            setSuccessMessage(null);
+
+            // Générer et sauvegarder la banque de questions
+            await quizService.generateAndSaveQuizPool(chapterId, courseId, settings);
+
+            // Afficher un message de succès
+            setSuccessMessage('Banque de questions générée avec succès!');
+            console.log('Banque de questions générée avec succès!');
+
+            setIsLoading(false);
+        } catch (error: any) {
+            console.error('Erreur lors de la génération des questions:', error);
+            setError(error.message || "Une erreur est survenue lors de la génération des questions");
+            setIsLoading(false);
+        }
+    };
+
+    const handleProviderChange = (provider: AIProvider) => {
+        setCurrentAIProvider(provider);
+        aiService.setProvider(provider);
     };
 
     return (
@@ -170,6 +197,42 @@ const QuizSettingsEditor: React.FC<QuizSettingsEditorProps> = ({
                                 onValueChange={(value) => handleChange('attemptsAllowed', value[0])}
                                 className="text-indigo-500"
                             />
+                        </div>                    </div>
+
+                    <div className="border-t border-gray-200 pt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Mode de génération des questions
+                        </label>
+                        <div className="space-y-2">
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="generationMode"
+                                    value="pool"
+                                    checked={settings.generationMode === 'pool'}
+                                    onChange={(e) => handleChange('generationMode', e.target.value)}
+                                    className="mt-1 text-indigo-500 focus:ring-indigo-500"
+                                />
+                                <div>
+                                    <span className="text-sm font-medium text-gray-700">Mode Banque</span>
+                                    <p className="text-xs text-gray-500">Génère une banque de questions en amont, puis pioche aléatoirement</p>
+                                </div>
+                            </label>
+
+                            <label className="flex items-start space-x-3 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="generationMode"
+                                    value="onTheFly"
+                                    checked={settings.generationMode === 'onTheFly'}
+                                    onChange={(e) => handleChange('generationMode', e.target.value)}
+                                    className="mt-1 text-indigo-500 focus:ring-indigo-500"
+                                />
+                                <div>
+                                    <span className="text-sm font-medium text-gray-700">Mode À la Volée</span>
+                                    <p className="text-xs text-gray-500">Génère des questions uniques pour chaque tentative via IA</p>
+                                </div>
+                            </label>
                         </div>
                     </div>
 
@@ -192,11 +255,40 @@ const QuizSettingsEditor: React.FC<QuizSettingsEditorProps> = ({
                                 className="rounded border-gray-300 text-indigo-500 focus:ring-indigo-500"
                             />
                             <span className="text-sm text-gray-700">Montrer le feedback immédiatement</span>                        </label>
-                    </div>
-                    
-                    {error && (
+                    </div>                    {error && (
                         <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md">
                             <p className="text-sm">Une erreur est survenue: {error}</p>
+                        </div>
+                    )}
+
+                    {successMessage && (
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 text-green-600 rounded-md">
+                            <p className="text-sm">{successMessage}</p>
+                        </div>
+                    )}                    {settings.generationMode === 'pool' && (
+                        <div className="border-t border-gray-200 pt-4">
+                            {/* Sélecteur de provider IA */}
+                            <AIProviderSelector
+                                currentProvider={currentAIProvider}
+                                onProviderChange={handleProviderChange}
+                                className="mb-4"
+                            />
+
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                                <h4 className="font-medium text-blue-900 mb-2">Génération automatique de questions</h4>
+                                <p className="text-sm text-blue-700 mb-3">
+                                    Utilisez l'IA pour générer automatiquement une banque de questions basée sur le contenu de ce chapitre.
+                                    Provider actuel: <strong>{getCurrentProviderConfig().name}</strong>
+                                </p><Button
+                                    variant="outlined"
+                                    onClick={handleGenerateQuestions}
+                                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                                    disabled={isLoading}
+                                >
+                                    <Book className="h-4 w-4 mr-2" />
+                                    Générer des questions avec l'IA
+                                </Button>
+                            </div>
                         </div>
                     )}
 

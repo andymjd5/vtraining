@@ -125,6 +125,7 @@ export interface MediaItem {
  * Paramètres de quiz
  */
 export interface QuizSettings {
+    generationMode: 'pool' | 'onTheFly'; // 'pool' pour banque de questions, 'onTheFly' pour génération à la volée
     passingScore: number;
     timeLimit: number;
     questionCount: number;
@@ -145,12 +146,14 @@ export interface QuizQuestion {
     answer: number;  // Index de la bonne réponse
     explanation?: string;
     difficulty?: 'easy' | 'medium' | 'hard';
+    generatedByAI?: boolean; // Indique si la question a été générée par l'IA
     createdAt: any;
     updatedAt: any;
 }
 
 /**
  * Tentative de quiz - Collection 'quiz_attempts'
+ * NOTE: Restructuré pour embarquer les questions directement dans la tentative.
  */
 export interface QuizAttempt {
     id: string;
@@ -163,10 +166,14 @@ export interface QuizAttempt {
     score: number;
     maxScore: number;
     passed: boolean;
-    answers: {
-        questionId: string;
-        selectedAnswer: number;
-        correct: boolean;
+    // Structure restructurée pour inclure les questions complètes
+    questionsAsked: {
+        questionText: string;       // Le texte de la question
+        options: string[];          // Les options de réponse proposées
+        correctAnswerIndex: number; // L'index de la bonne réponse
+        selectedAnswerIndex?: number;// L'index de la réponse de l'utilisateur
+        isCorrect?: boolean;         // Le résultat pour cette question
+        explanation?: string;       // L'explication (si disponible)
     }[];
 }
 

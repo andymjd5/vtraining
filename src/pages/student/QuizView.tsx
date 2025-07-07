@@ -4,7 +4,7 @@ import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { quizService } from '../../services/quizService';
-import { QuizSettings, QuizQuestion, Chapter } from '../../types/course';
+import { QuizQuestion, Chapter } from '../../types/course';
 
 // Interfaces nécessaires pour ce composant
 interface Course {
@@ -39,9 +39,7 @@ const QuizView: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes en secondes par défaut
-  const [isLoading, setIsLoading] = useState(true);
-  const [quizCompleted, setQuizCompleted] = useState(false);
-  const [score, setScore] = useState(0);
+  const [isLoading, setIsLoading] = useState(true); const [quizCompleted, setQuizCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<QuizResult | null>(null);
 
@@ -90,11 +88,9 @@ const QuizView: React.FC = () => {
         // Définir le temps limite basé sur les paramètres du quiz
         if (chapterData.quizSettings?.timeLimit) {
           setTimeLeft(chapterData.quizSettings.timeLimit * 60); // Convertir minutes en secondes
-        }
-
-        // Charger les questions du quiz
+        }        // Charger les questions du quiz
         try {
-          const questionsData = await quizService.getQuizQuestionsByChapterId(chapterId);
+          const questionsData = await quizService.startQuizSession(user?.uid || 'anonymous', chapterId, courseId);
 
           if (questionsData && questionsData.length > 0) {
             // Si on a des questions, on les utilise
@@ -163,15 +159,10 @@ const QuizView: React.FC = () => {
       completedAt: new Date(),
       timeTaken: chapter.quizSettings?.timeLimit ? (chapter.quizSettings.timeLimit * 60) - timeLeft : 0,
       isPassed
-    };
-
-    setScore(scorePercentage);
-    setResult(quizResult);
-    setQuizCompleted(true);
-
-    try {
+    }; setResult(quizResult);
+    setQuizCompleted(true); try {
       // Enregistrer le résultat dans Firestore
-      await quizService.saveQuizAttempt({
+      await quizService.saveQuizAttemptNew({
         userId: user.uid,
         courseId,
         chapterId,
@@ -180,10 +171,13 @@ const QuizView: React.FC = () => {
         startedAt: Timestamp.now(),
         completedAt: Timestamp.now(),
         maxScore: 100,
-        answers: Object.entries(selectedAnswers).map(([questionIndex, answerIndex]) => ({
-          questionId: questions[parseInt(questionIndex)].id || `q-${questionIndex}`,
-          selectedAnswer: answerIndex,
-          correct: answerIndex === questions[parseInt(questionIndex)].answer
+        questionsAsked: questions.map((question, index) => ({
+          questionText: question.question,
+          options: question.options,
+          correctAnswerIndex: question.answer,
+          selectedAnswerIndex: selectedAnswers[index],
+          isCorrect: selectedAnswers[index] === question.answer,
+          explanation: question.explanation
         }))
       });
     } catch (err) {
@@ -249,8 +243,8 @@ const QuizView: React.FC = () => {
             <label
               key={index}
               className={`flex items-center p-3 rounded-md border cursor-pointer transition-colors ${selectedAnswers[currentQuestion] === index
-                  ? 'bg-indigo-50 border-indigo-300'
-                  : 'border-gray-200 hover:bg-gray-50'
+                ? 'bg-indigo-50 border-indigo-300'
+                : 'border-gray-200 hover:bg-gray-50'
                 }`}
             >
               <input
@@ -275,8 +269,8 @@ const QuizView: React.FC = () => {
         onClick={goToPreviousQuestion}
         disabled={currentQuestion === 0}
         className={`px-4 py-2 rounded ${currentQuestion === 0
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
       >
         Question précédente
