@@ -1,8 +1,9 @@
 // src/components/course-editor/ChapterEditor.tsx
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical } from 'lucide-react';
-import { ChapterWithSections, SectionWithContent } from '../../types/course';
+import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Settings } from 'lucide-react';
+import { ChapterWithSections, SectionWithContent, QuizSettings } from '../../types/course';
 import SectionEditor from './SectionEditor';
+import QuizSettingsEditor from './QuizSettingsEditor';
 
 interface ChapterEditorProps {
     chapter: ChapterWithSections;
@@ -42,12 +43,34 @@ const ChapterEditor: React.FC<ChapterEditorProps> = ({
             ...chapter,
             title: e.target.value
         });
-    };
-
-    const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    }; const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         onChapterUpdate({
             ...chapter,
             description: e.target.value
+        });
+    };
+
+    const handleToggleQuiz = (enabled: boolean) => {
+        onChapterUpdate({
+            ...chapter,
+            hasQuiz: enabled,
+            // If quiz is being enabled and there are no settings yet, initialize with defaults
+            quizSettings: enabled && !chapter.quizSettings ? {
+                passingScore: 60,
+                timeLimit: 15,
+                questionCount: 5,
+                isRandomized: true,
+                showFeedbackImmediately: false,
+                attemptsAllowed: 3
+            } : chapter.quizSettings
+        });
+    };
+
+    const handleSaveQuizSettings = (settings: QuizSettings) => {
+        onChapterUpdate({
+            ...chapter,
+            hasQuiz: true,
+            quizSettings: settings
         });
     };
 
@@ -114,9 +137,7 @@ const ChapterEditor: React.FC<ChapterEditorProps> = ({
                         <Trash2 className="h-4 w-4" />
                     </button>
                 </div>
-            </div>
-
-            {isActive && expanded && (
+            </div>            {isActive && expanded && (
                 <div className="px-4 pb-4">
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -128,6 +149,17 @@ const ChapterEditor: React.FC<ChapterEditorProps> = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500"
                             rows={2}
                             placeholder="Description du chapitre..."
+                        />
+                    </div>
+
+                    {/* Quiz Settings Editor */}
+                    <div className="mt-4">
+                        <QuizSettingsEditor
+                            chapterId={chapter.id}
+                            hasQuiz={chapter.hasQuiz || false}
+                            quizSettings={chapter.quizSettings || null}
+                            onToggleQuiz={handleToggleQuiz}
+                            onSaveSettings={handleSaveQuizSettings}
                         />
                     </div>
                 </div>
