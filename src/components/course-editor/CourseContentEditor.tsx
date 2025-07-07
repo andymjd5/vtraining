@@ -618,35 +618,35 @@ const CourseContentEditor: React.FC<CourseContentEditorProps> = ({
                             </button>
                         </div>
                     ) : (
-                        chapters.map((chapter) => (
-                            <ChapterEditor
-                                key={chapter.id}
-                                chapter={chapter}
-                                isActive={activeChapter === chapter.id}
-                                onChapterClick={(id) => {
-                                    setActiveChapter(id);
-                                    // Sélectionner la première section si le chapitre en a
-                                    const ch = chapters.find(c => c.id === id);
-                                    if (ch && ch.sections.length > 0) {
-                                        setActiveSection(ch.sections[0].id);
-                                    } else {
-                                        setActiveSection(null);
-                                    }
-                                }}
-                                onChapterUpdate={handleUpdateChapter}
-                                onChapterDelete={handleDeleteChapter}
-                                onSectionClick={(chapterId, sectionId) => {
-                                    setActiveChapter(chapterId);
-                                    setActiveSection(sectionId);
-                                }}
-                                activeSection={activeSection}
-                                onSectionUpdate={handleUpdateSection}
-                                onAddSection={handleAddSection}
-                                onSectionDelete={handleDeleteSection}
-                                onDragStart={handleDragStart}
-                                onDragOver={handleDragOver}
-                                onDrop={handleDrop}
-                            />
+                        chapters.map((chapter) => (<ChapterEditor
+                            key={chapter.id}
+                            chapter={chapter}
+                            courseId={courseId}
+                            isActive={activeChapter === chapter.id}
+                            onChapterClick={(id) => {
+                                setActiveChapter(id);
+                                // Sélectionner la première section si le chapitre en a
+                                const ch = chapters.find(c => c.id === id);
+                                if (ch && ch.sections.length > 0) {
+                                    setActiveSection(ch.sections[0].id);
+                                } else {
+                                    setActiveSection(null);
+                                }
+                            }}
+                            onChapterUpdate={handleUpdateChapter}
+                            onChapterDelete={handleDeleteChapter}
+                            onSectionClick={(chapterId, sectionId) => {
+                                setActiveChapter(chapterId);
+                                setActiveSection(sectionId);
+                            }}
+                            activeSection={activeSection}
+                            onSectionUpdate={handleUpdateSection}
+                            onAddSection={handleAddSection}
+                            onSectionDelete={handleDeleteSection}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                        />
                         ))
                     )}
                 </div>
