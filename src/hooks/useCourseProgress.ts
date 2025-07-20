@@ -52,10 +52,44 @@ export function useCourseProgress(userId: string, courseId: string): UseCoursePr
         prog = await userCourseProgressService.createOrInitProgress({ userId, courseId });
       }
       setProgress(prog);
-      // Reset navigation if needed
-      setCurrentChapterIndex(0);
-      setCurrentSectionIndex(0);
-      setCurrentBlockIndex(0);
+
+      // Nouvelle logique : positionner l'utilisateur sur la dernière progression connue
+      if (courseData && prog && Array.isArray(courseData.chapters)) {
+        // Chercher l'index du chapitre
+        let chapterIdx = 0;
+        let sectionIdx = 0;
+        let blockIdx = 0;
+        if (prog.lastChapterId) {
+          chapterIdx = courseData.chapters.findIndex(ch => ch.id === prog.lastChapterId);
+          if (chapterIdx === -1) chapterIdx = 0;
+        }
+        if (prog.lastSectionId && courseData.chapters[chapterIdx]) {
+          sectionIdx = courseData.chapters[chapterIdx].sections.findIndex(sec => sec.id === prog.lastSectionId);
+          if (sectionIdx === -1) sectionIdx = 0;
+        }
+        if (prog.lastContentBlockId && courseData.chapters[chapterIdx]?.sections[sectionIdx]) {
+          blockIdx = courseData.chapters[chapterIdx].sections[sectionIdx].content.findIndex(b => b.id === prog.lastContentBlockId);
+          if (blockIdx === -1) blockIdx = 0;
+        }
+        // Aller à l'épisode suivant non validé si possible
+        // Si le dernier bloc est validé, avancer au suivant
+        const completedBlocks = prog.completedBlocks || [];
+        const sectionContent = courseData.chapters[chapterIdx]?.sections[sectionIdx]?.content || [];
+        if (blockIdx < sectionContent.length - 1) {
+          // Si le bloc courant est validé, avancer au suivant non validé
+          let nextBlock = blockIdx;
+          while (nextBlock < sectionContent.length && completedBlocks.includes(sectionContent[nextBlock].id)) {
+            nextBlock++;
+          }
+          if (nextBlock < sectionContent.length) {
+            blockIdx = nextBlock;
+          }
+        }
+        setCurrentChapterIndex(chapterIdx);
+        setCurrentSectionIndex(sectionIdx);
+        setCurrentBlockIndex(blockIdx);
+      }
+      // Sinon, ne rien faire (ne pas reset navigation)
     } catch (err) {
       setError(err);
     } finally {
@@ -149,7 +183,7 @@ export function useCourseProgress(userId: string, courseId: string): UseCoursePr
       completedChapters: newCompletedChapters,
       lastChapterId: currentChapter.id,
       lastSectionId: currentSection.id,
-      lastContentBlockId: currentSection.content[currentSection.content.length - 1]?.id || null,
+      lastContentBlockId: currentSection.content[currentSection.content.length - 1]?.id || undefined,
     });
     await fetchAll();
   };

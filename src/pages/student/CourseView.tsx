@@ -65,6 +65,8 @@ export default function CourseView() {
   const navigate = useNavigate();
   const { forceExpand } = useSidebar();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Nouvel état pour savoir si on est sur l'étape quiz d'un chapitre
+  const [selectedQuizChapterId, setSelectedQuizChapterId] = useState<string | null>(null);
 
   const {
     course,
@@ -89,6 +91,19 @@ export default function CourseView() {
   } = useCourseProgress(user?.uid || '', courseId || '');
 
   const { toasts, success, removeToast } = useToast();
+
+  // Helpers pour navigation : reset l'étape quiz si on change de chapitre/section
+  const handleSelectChapter = (index: number) => {
+    setSelectedQuizChapterId(null);
+    selectChapter(index);
+  };
+  const handleSelectSection = (index: number) => {
+    setSelectedQuizChapterId(null);
+    selectSection(index);
+  };
+  const handleQuizSelect = (chapterId: string) => {
+    setSelectedQuizChapterId(chapterId);
+  };
 
   if (loading) {
     return (
@@ -144,6 +159,7 @@ export default function CourseView() {
   })();
 
   const goToPrev = () => {
+    setSelectedQuizChapterId(null);
     if (currentBlockIndex > 0) {
       selectBlock(currentBlockIndex - 1);
     } else if (currentSectionIndex > 0 && currentChapter) {
@@ -171,6 +187,28 @@ export default function CourseView() {
   };
 
   const goToNext = () => {
+    // Si on est sur l'étape quiz, passer au chapitre suivant
+    if (selectedQuizChapterId) {
+      // Trouver l'index du chapitre courant (celui du quiz)
+      const quizChapterIdx = course?.chapters?.findIndex(ch => ch.id === selectedQuizChapterId) ?? -1;
+      setSelectedQuizChapterId(null);
+      if (quizChapterIdx >= 0 && course?.chapters && quizChapterIdx < course.chapters.length - 1) {
+        selectChapter(quizChapterIdx + 1);
+        selectSection(0);
+        selectBlock(0);
+      }
+      return;
+    }
+    // Si on est sur la dernière section d'un chapitre qui a un quiz, aller à l'étape quiz
+    if (
+      currentChapter &&
+      currentChapter.hasQuiz &&
+      currentSectionIndex === (currentChapter.sections.length - 1)
+    ) {
+      setSelectedQuizChapterId(currentChapter.id);
+      return;
+    }
+    // Navigation normale
     if (currentSection && currentBlockIndex < (currentSection.content?.length || 0) - 1) {
       selectBlock(currentBlockIndex + 1);
     } else if (currentChapter && currentSectionIndex < (currentChapter.sections?.length || 0) - 1) {
@@ -191,11 +229,6 @@ export default function CourseView() {
   const handleBlockComplete = async () => {
     await markBlockComplete();
     success('Bloc validé avec succès !');
-  };
-
-  // Callback pour la navigation vers un quiz
-  const handleQuizSelect = (chapterId: string) => {
-    navigate(`/quiz/${chapterId}`);
   };
 
   const isCurrentChapterCompleted = currentChapter?.id ? progress?.completedChapters?.includes(currentChapter.id) : false;
@@ -225,15 +258,13 @@ export default function CourseView() {
                     <CourseNavigation
             chapters={course.chapters || []}
             currentChapterId={currentChapter?.id || ''}
-            onSelectChapter={selectChapter}
+            onSelectChapter={handleSelectChapter}
             currentSectionId={currentSection?.id || null}
-            onSelectSection={selectSection}
+            onSelectSection={handleSelectSection}
             completedQuizzes={progress?.completedQuizzes}
             completedChapters={progress?.completedChapters}
-            completedSections={progress?.completedSections}
+            completedSections={completedSections}
             onSelectQuiz={handleQuizSelect}
-            course={course}
-            userProgress={progress}
                     />
         </div>
         <div className="p-4 border-t bg-gray-50">
@@ -295,12 +326,12 @@ export default function CourseView() {
                 chapters={course.chapters || []}
                 currentChapterId={currentChapter?.id || ''}
                 onSelectChapter={(index) => {
-                  selectChapter(index);
+                  handleSelectChapter(index);
                   setMobileNavOpen(false);
                 }}
                 currentSectionId={currentSection?.id || ''}
                 onSelectSection={(index) => {
-                  selectSection(index);
+                  handleSelectSection(index);
                   setMobileNavOpen(false);
                 }}
                 completedQuizzes={progress?.completedQuizzes || []}
@@ -333,33 +364,32 @@ export default function CourseView() {
           </div>
         </div>
 
-        {/* Content block */}
+        {/* Content block ou quiz */}
         <section className="flex-1 flex flex-col items-center justify-center px-2 md:px-8 py-6 md:py-12 pb-20 md:pb-12">
           <div className="w-full max-w-3xl">
-            <CourseContentDisplay
-              contentBlock={currentBlock}
-              progress={progress}
-              validateBlock={validateBlock}
-              onComplete={handleBlockComplete}
-              onStart={() => {}}
-              onPrev={goToPrev}
-              onNext={goToNext}
-              hasPrev={hasPrevBlock}
-              hasNext={hasNextBlock}
-            />
-            {/* Quiz à la fin du chapitre */}
-            {currentChapter?.hasQuiz &&
-              currentBlockIndex === (currentSection?.content?.length || 1) - 1 &&
-              currentSectionIndex === (currentChapter.sections?.length || 1) - 1 && (
-                <div className="mt-8">
-                  <CourseQuiz
-                    chapterId={currentChapter.id}
-                    courseId={course.id}
-                    onQuizComplete={() => {}}
-                  />
-                </div>
-              )}
-            </div>
+            {/* Affichage du quiz si sélectionné, sinon affichage du contenu */}
+            {selectedQuizChapterId ? (
+              <div className="mt-8">
+                <CourseQuiz
+                  chapterId={selectedQuizChapterId}
+                  courseId={course.id}
+                  onQuizComplete={() => setSelectedQuizChapterId(null)}
+                />
+              </div>
+            ) : (
+              <CourseContentDisplay
+                contentBlock={currentBlock}
+                progress={progress}
+                validateBlock={validateBlock}
+                onComplete={handleBlockComplete}
+                onStart={() => {}}
+                onPrev={goToPrev}
+                onNext={goToNext}
+                hasPrev={hasPrevBlock}
+                hasNext={hasNextBlock}
+              />
+            )}
+          </div>
         </section>
 
         {/* Footer navigation (mobile ou sticky desktop) */}
