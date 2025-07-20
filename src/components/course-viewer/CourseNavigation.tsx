@@ -25,6 +25,11 @@ const CourseNavigation: React.FC<CourseNavigationProps> = ({
   completedSections = [],
   onSelectQuiz,
 }) => {
+
+  useEffect(() => {
+    console.log('Completed sections', completedSections)
+  }, [completedSections])
+
   // Fonction pour déterminer si un quiz est disponible
   const isQuizAvailable = (chapter: any) => {
     if (!chapter.hasQuiz) return false;
@@ -84,7 +89,8 @@ const CourseNavigation: React.FC<CourseNavigationProps> = ({
                 <ul className="pl-8 py-2 space-y-1">
                   {chapter.sections.map((section: any, sIdx: number) => {
                     const isSectionCurrent = section.id === currentSectionId;
-                    const isSectionCompleted = completedSections.some(cs => cs.chapterId === chapter.id && cs.sectionId === section.id);
+                    const isSectionCompleted = completedSections.some(cs => cs === section.id);
+                   
                     return (
                       <li key={section.id}>
                         <button

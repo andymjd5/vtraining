@@ -226,12 +226,14 @@ export default function CourseView() {
             chapters={course.chapters || []}
             currentChapterId={currentChapter?.id || ''}
             onSelectChapter={selectChapter}
-            currentSectionId={currentSection?.id || ''}
+            currentSectionId={currentSection?.id || null}
             onSelectSection={selectSection}
-            completedQuizzes={progress?.completedQuizzes || []}
-            completedChapters={progress?.completedChapters || []}
-            completedSections={completedSections}
+            completedQuizzes={progress?.completedQuizzes}
+            completedChapters={progress?.completedChapters}
+            completedSections={progress?.completedSections}
             onSelectQuiz={handleQuizSelect}
+            course={course}
+            userProgress={progress}
                     />
         </div>
         <div className="p-4 border-t bg-gray-50">

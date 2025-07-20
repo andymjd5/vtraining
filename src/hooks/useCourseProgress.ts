@@ -86,12 +86,29 @@ export function useCourseProgress(userId: string, courseId: string): UseCoursePr
   };
 
   // Calcul progression
-  const totalBlocks = course?.chapters?.reduce((sum, ch) => sum + ch.sections.reduce((s, sec) => s + (sec.content?.length || 0), 0), 0) || 0;
-  const completedBlocks = progress?.completedBlocks?.length || 0;
-  const progressPercentage = totalBlocks > 0 ? Math.round((completedBlocks / totalBlocks) * 100) : 0;
+  // Ancienne version (par blocs)
+  // const totalBlocks = course?.chapters?.reduce((sum, ch) => sum + ch.sections.reduce((s, sec) => s + (sec.content?.length || 0), 0), 0) || 0;
+  // const completedBlocks = progress?.completedBlocks?.length || 0;
+  // const progressPercentage = totalBlocks > 0 ? Math.round((completedBlocks / totalBlocks) * 100) : 0;
+
+  // Nouvelle version : progression basée sur sections + quiz
+  // 1. Nombre total de sections
+  const totalSections = course?.chapters?.reduce((sum, ch) => sum + (ch.sections?.length || 0), 0) || 0;
+  // 2. Nombre total de quiz (un par chapitre qui a un quiz)
+  const totalQuizzes = course?.chapters?.filter(ch => ch.hasQuiz).length || 0;
+  // 3. Total à compléter
+  const totalToComplete = totalSections + totalQuizzes;
+  // 4. Sections complétées
+  const completedSections = progress?.completedSections?.length || 0;
+  // 5. Quiz complétés
+  const completedQuizzes = progress?.completedQuizzes?.length || 0;
+  // 6. Total complété
+  const totalCompleted = completedSections + completedQuizzes;
+  // 7. Pourcentage
+  const progressPercentage = totalToComplete > 0 ? Math.round((totalCompleted / totalToComplete) * 100) : 0;
   const timeSpent = progress?.timeSpent || 0;
   // Estimation naïve : 2 min par bloc restant
-  const estimatedTimeRemaining = totalBlocks > completedBlocks ? (totalBlocks - completedBlocks) * 2 : 0;
+  const estimatedTimeRemaining = totalToComplete > totalCompleted ? (totalToComplete - totalCompleted) * 2 : 0;
 
   // Validation d'un bloc (à la volée, ex: scroll 40%)
   const validateBlock = async () => {

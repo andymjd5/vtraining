@@ -36,7 +36,7 @@ interface AuthContextType extends AuthState {
 const defaultAuthState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: true,
   initializing: true,
   error: null,
 };
