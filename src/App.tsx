@@ -22,6 +22,7 @@ const CompanyAdminLogin = lazy(() => import('./pages/auth/CompanyAdminLogin'));
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
 const StudentCourses = lazy(() => import('./pages/student/Courses'));
 const CourseView = lazy(() => import('./pages/student/CourseView'));
+const CoursePreview = lazy(() => import('./pages/student/CoursePreview'));
 const QuizView = lazy(() => import('./pages/student/QuizView'));
 const Certificates = lazy(() => import('./pages/student/Certificates'));
 const Profile = lazy(() => import('./pages/student/Profile'));
@@ -114,6 +115,7 @@ function App() {
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="courses" element={<StudentCourses />} />
             <Route path="courses/:courseId" element={<CourseView />} />
+            <Route path="courses/:courseId/preview" element={<CoursePreview />} />
             <Route path="quiz/:quizId" element={<QuizView />} />
             <Route path="certificates" element={<Certificates />} />
             <Route path="profile" element={<Profile />} />

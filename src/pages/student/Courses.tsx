@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -79,6 +79,7 @@ interface Instructor {
 
 const Courses = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
@@ -322,6 +323,17 @@ const Courses = () => {
     setSortBy('title');
   };
 
+  // Navigation intelligente vers un cours
+  const handleCourseClick = (course: Course) => {
+    // Si l'utilisateur a déjà une progression, aller directement au cours
+    if (course.progress && course.progress > 0) {
+      navigate(`/student/courses/${course.id}`);
+    } else {
+      // Sinon, aller à l'aperçu du cours
+      navigate(`/student/courses/${course.id}/preview`);
+    }
+  };
+
   // 🎨 Composant Loading Skeleton moderne
   const CourseSkeleton = () => (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -529,10 +541,10 @@ const Courses = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredCourses.map((course) => (
-            <Link
+            <div
               key={course.id}
-              to={`/student/courses/${course.id}`}
-              className="group block"
+              onClick={() => handleCourseClick(course)}
+              className="group block cursor-pointer"
             >
               <Card className="h-full hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border-0 overflow-hidden bg-white">
                 {/* Image/Thumbnail */}
@@ -660,7 +672,7 @@ const Courses = () => {
                   </div>
                 </div>
               </Card>
-            </Link>
+            </div>
           ))}
         </div>
       )}
