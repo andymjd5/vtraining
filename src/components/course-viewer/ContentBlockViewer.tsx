@@ -11,6 +11,8 @@ interface ContentBlockViewerProps {
     onBlockEnter?: (blockId: string) => void;
     onBlockComplete?: (blockId: string) => void;
     onBlockExit?: () => void;
+    isValidated?: boolean;
+    validateBlock?: (blockId: string) => void;
 }
 
 const ContentBlockViewer: React.FC<ContentBlockViewerProps> = ({
@@ -20,7 +22,9 @@ const ContentBlockViewer: React.FC<ContentBlockViewerProps> = ({
     isActive = false,
     onBlockEnter,
     onBlockComplete,
-    onBlockExit
+    onBlockExit,
+    isValidated,
+    validateBlock
 }) => {
     const [hasBeenViewed, setHasBeenViewed] = useState(false);
     const [viewStartTime, setViewStartTime] = useState<Date | null>(null);
@@ -102,6 +106,23 @@ const ContentBlockViewer: React.FC<ContentBlockViewerProps> = ({
         setHasBeenViewed(true);
         onBlockComplete?.(block.id);
     };
+
+    // Validation automatique via Intersection Observer
+    useEffect(() => {
+        if (!blockRef.current || isValidated) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.intersectionRatio >= 0.4 && !blockRef.current?.dataset.validated) {
+                    validateBlock?.(block.id);
+                    blockRef.current.dataset.validated = 'true';
+                }
+            },
+            { threshold: [0, 0.4, 1] }
+        );
+        observer.observe(blockRef.current);
+        return () => observer.disconnect();
+    }, [validateBlock, isValidated, block.id]);
+
     const renderContent = () => {
         switch (block.type) {
             case 'text':
@@ -237,6 +258,7 @@ const ContentBlockViewer: React.FC<ContentBlockViewerProps> = ({
         <div
             ref={blockRef}
             data-block-id={block.id}
+            data-validated={isValidated ? 'true' : undefined}
             className={`content-block content-block-${block.type} ${className} relative ${isCompleted ? 'ring-2 ring-green-500 ring-opacity-50' : ''
                 } ${isActive ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}
         >

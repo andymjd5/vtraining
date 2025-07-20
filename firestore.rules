@@ -142,5 +142,14 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update, delete: if isSuperAdmin();
     }
+
+    // Progression détaillée utilisateur/cours
+    match /user_course_progress/{progressId} {
+      allow read, write: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isCompanyAdmin() && belongsToCompany(get(/databases/$(database)/documents/users/$(resource.data.userId)).data.companyId)) ||
+        isUserOwner(resource.data.userId)
+      );
+    }
   }
 }

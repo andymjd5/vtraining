@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../hooks/useAuth';
+import { useCourseProgress } from '../../hooks/useCourseProgress';
 import Card from '../../components/ui/Card';
 import { BookOpen, Clock, User, Search, Filter, X, Play, CheckCircle, BookmarkIcon, Star } from 'lucide-react';
 
@@ -216,17 +217,6 @@ const Courses = () => {
     }
   };
 
-  // 🎯 Récupération de la progression utilisateur (pour l'instant mockée, en attendant le système de progression)
-  const getUserProgress = (courseId: string) => {
-    // TODO: Implémenter la vraie progression depuis la collection progress_tracking
-    return {
-      progress: Math.floor(Math.random() * 101),
-      status_user: ['not-started', 'in-progress', 'completed'][Math.floor(Math.random() * 3)] as 'not-started' | 'in-progress' | 'completed',
-      lastAccessedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Dernier accès dans les 30 derniers jours
-      completedContentBlocks: []
-    };
-  };
-
   // 🚀 Enrichissement des données des cours
   const enrichCoursesData = async (coursesData: Course[]): Promise<Course[]> => {
     if (coursesData.length === 0) return [];
@@ -245,13 +235,13 @@ const Courses = () => {
       const stats = await calculateCourseStats(course.id, course.chaptersOrder || []);
 
       // Récupérer la progression utilisateur
-      const userProgress = getUserProgress(course.id);
+      // const userProgress = getUserProgress(course.id); // Supprimé
 
       return {
         ...course,
         instructor,
         ...stats,
-        ...userProgress,
+        // ...userProgress, // Supprimé
         // Ajouter des métadonnées calculées
         difficulty: course.level === 'Débutant' ? 'Facile' as const :
           course.level === 'Intermédiaire' ? 'Moyen' as const : 'Difficile' as const,

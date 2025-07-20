@@ -119,18 +119,6 @@ export interface Certificate {
   createdAt: any;
 }
 
-export interface ProgressTracking {
-  id: string;
-  enrollmentId: string;
-  userId: string;
-  courseId: string;
-  companyId: string;
-  chapterId: string;
-  completed: boolean;
-  timeSpent: number;
-  lastAccessed: any;
-}
-
 export interface ActivityLog {
   id: string;
   userId: string;
@@ -153,4 +141,21 @@ export interface CompanyFile {
   url: string;
   uploadedAt: any;
   uploadedBy: string | null;
+}
+
+export interface UserCourseProgress {
+  id: string; // userId_courseId
+  userId: string;
+  courseId: string;
+  completedChapters: string[];
+  completedSections: string[];
+  completedBlocks: string[];
+  completedQuizzes: string[];
+  contentBlocksTimeSpent: { [blockId: string]: number };
+  timeSpent: number;
+  lastAccessedAt: any;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  lastChapterId?: string;
+  lastSectionId?: string;
+  lastContentBlockId?: string;
 }

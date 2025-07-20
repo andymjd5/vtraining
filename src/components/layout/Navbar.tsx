@@ -5,7 +5,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from '../ui/Logo';
 
-const Navbar = () => {
+interface NavbarProps {
+  onMenuToggle?: () => void;
+}
+
+const Navbar = ({ onMenuToggle }: NavbarProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
@@ -28,10 +32,20 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className="bg-white shadow-md">
+    <nav className="bg-white shadow-md fixed top-0 left-0 right-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
+            {/* Bouton menu pour sidebar mobile (visible seulement si authentifié) */}
+            {isAuthenticated && (
+              <button
+                onClick={onMenuToggle}
+                className="mr-4 p-2 rounded-lg text-gray-700 hover:text-red-600 hover:bg-gray-100 transition-colors md:hidden"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+            )}
+            
             <Link to="/" className="flex-shrink-0 flex items-center">
               <Logo className="h-10 w-auto" />
             </Link>
@@ -43,7 +57,7 @@ const Navbar = () => {
               <Link
                 key={item.name}
                 to={item.path}
-                className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                className="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 {item.name}
               </Link>
@@ -53,9 +67,9 @@ const Navbar = () => {
               <div className="relative ml-4">
                 <button
                   onClick={toggleDropdown}
-                  className="flex items-center text-sm font-medium text-gray-700 hover:text-primary-600 focus:outline-none"
+                  className="flex items-center text-sm font-medium text-gray-700 hover:text-red-600 focus:outline-none"
                 >
-                  <span className="mr-1">{user?.name}</span>
+                  <span className="mr-1">{user?.name || user?.email}</span>
                   <ChevronDown className="h-4 w-4" />
                 </button>
 
@@ -96,32 +110,34 @@ const Navbar = () => {
             ) : (
               <Link
                 to="/login"
-                className="ml-4 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors"
+                className="ml-4 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
               >
                 Connexion
               </Link>
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <div className="flex items-center md:hidden">
-            <button
-              onClick={toggleMenu}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-primary-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
-            >
-              {isOpen ? (
-                <X className="h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="h-6 w-6" aria-hidden="true" />
-              )}
-            </button>
-          </div>
+          {/* Mobile menu button (seulement si pas authentifié) */}
+          {!isAuthenticated && (
+            <div className="flex items-center md:hidden">
+              <button
+                onClick={toggleMenu}
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-red-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-500"
+              >
+                {isOpen ? (
+                  <X className="h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <Menu className="h-6 w-6" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu (seulement si pas authentifié) */}
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && !isAuthenticated && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -133,43 +149,20 @@ const Navbar = () => {
                 <Link
                   key={item.name}
                   to={item.path}
-                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100"
+                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-red-600 hover:bg-gray-100"
                   onClick={toggleMenu}
                 >
                   {item.name}
                 </Link>
               ))}
 
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to="/profile"
-                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100 flex items-center"
-                    onClick={toggleMenu}
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    Mon Profil
-                  </Link>
-                  <button
-                    onClick={() => {
-                      handleLogout();
-                      toggleMenu();
-                    }}
-                    className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100 flex items-center"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Déconnexion
-                  </button>
-                </>
-              ) : (
-                <Link
-                  to="/login"
-                  className="block px-3 py-2 rounded-md text-base font-medium text-white bg-primary-600 hover:bg-primary-700 my-2"
-                  onClick={toggleMenu}
-                >
-                  Connexion
-                </Link>
-              )}
+              <Link
+                to="/login"
+                className="block px-3 py-2 rounded-md text-base font-medium text-white bg-red-600 hover:bg-red-700 my-2"
+                onClick={toggleMenu}
+              >
+                Connexion
+              </Link>
             </div>
           </motion.div>
         )}

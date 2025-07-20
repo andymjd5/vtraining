@@ -136,8 +136,9 @@ export const analyticsService = {
 
         // Get progress tracking - CORRECTION: nom de collection en minuscule
         const progressQuery = query(
-          collection(db, 'progress_tracking'),
-          where('enrollmentId', '==', enrollmentDoc.id)
+          collection(db, 'user_course_progress'),
+          where('userId', '==', userId),
+          where('courseId', '==', enrollment.courseId)
         );
         const progressSnapshot = await getDocs(progressQuery);
 
@@ -241,8 +242,9 @@ export const analyticsService = {
 
         // Get progress for this enrollment - CORRECTION: nom de collection en minuscule
         const progressQuery = query(
-          collection(db, 'progress_tracking'),
-          where('enrollmentId', '==', enrollmentDoc.id)
+          collection(db, 'user_course_progress'),
+          where('userId', '==', enrollment.userId),
+          where('courseId', '==', courseId)
         );
         const progressSnapshot = await getDocs(progressQuery);
         

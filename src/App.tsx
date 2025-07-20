@@ -6,6 +6,7 @@ import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
 import LoadingScreen from './components/ui/LoadingScreen';
 import ToastContainer from './components/ui/ToastContainer';
 import { useToast } from './hooks/useToast';
+import { SidebarProvider } from './contexts/SidebarContext';
 import { UserRole } from './types';
 
 // Lazy loaded components
@@ -55,7 +56,7 @@ function App() {
   }
 
   return (
-    <>
+    <SidebarProvider>
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
@@ -176,7 +177,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-    </>
+    </SidebarProvider>
   );
 }
 
