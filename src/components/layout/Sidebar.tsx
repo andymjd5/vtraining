@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -6,7 +5,6 @@ import {
   BookOpen, 
   Award, 
   User, 
-  Bell, 
   HelpCircle, 
   LogOut,
   Users,
@@ -14,8 +12,9 @@ import {
   Settings,
   Building,
   FileText,
-  UserPlus,
-  BookCheck
+  BookCheck,
+  Ticket,
+  Library
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { UserRole } from '../../types';
@@ -25,7 +24,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ userRole }: SidebarProps) => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -39,14 +38,18 @@ const Sidebar = ({ userRole }: SidebarProps) => {
         return [
           { name: 'Tableau de bord', path: '/student/dashboard', icon: <Home className="h-5 w-5" /> },
           { name: 'Mes cours', path: '/student/courses', icon: <BookOpen className="h-5 w-5" /> },
+          { name: 'Bibliothèque', path: '/student/library', icon: <Library className="h-5 w-5" /> },
           { name: 'Mes certificats', path: '/student/certificates', icon: <Award className="h-5 w-5" /> },
           { name: 'Mon profil', path: '/student/profile', icon: <User className="h-5 w-5" /> },
+          { name: 'Support', path: '/student/support', icon: <HelpCircle className="h-5 w-5" /> },
         ];
       case UserRole.COMPANY_ADMIN:
         return [
           { name: 'Tableau de bord', path: '/company-admin/dashboard', icon: <Home className="h-5 w-5" /> },
           { name: 'Gestion des agents', path: '/company-admin/users', icon: <Users className="h-5 w-5" /> },
           { name: 'Cours affectés', path: '/company-admin/assigned-courses', icon: <BookCheck className="h-5 w-5" /> },
+          { name: 'Bibliothèque', path: '/company-admin/library', icon: <Library className="h-5 w-5" /> },
+          { name: 'Tickets', path: '/company-admin/tickets', icon: <Ticket className="h-5 w-5" /> },
           { name: 'Rapports', path: '/company-admin/reports', icon: <BarChart className="h-5 w-5" /> },
           { name: 'Paramètres', path: '/company-admin/settings', icon: <Settings className="h-5 w-5" /> },
         ];
@@ -55,7 +58,9 @@ const Sidebar = ({ userRole }: SidebarProps) => {
           { name: 'Tableau de bord', path: '/super-admin/dashboard', icon: <Home className="h-5 w-5" /> },
           { name: 'Entreprises', path: '/super-admin/companies', icon: <Building className="h-5 w-5" /> },
           { name: 'Formations', path: '/super-admin/courses', icon: <BookOpen className="h-5 w-5" /> },
+          { name: 'Bibliothèque', path: '/super-admin/library', icon: <Library className="h-5 w-5" /> },
           { name: 'Utilisateurs', path: '/super-admin/users', icon: <Users className="h-5 w-5" /> },
+          { name: 'Tickets', path: '/super-admin/tickets', icon: <Ticket className="h-5 w-5" /> },
           { name: 'Rapports', path: '/super-admin/reports', icon: <FileText className="h-5 w-5" /> },
           { name: 'Paramètres', path: '/super-admin/settings', icon: <Settings className="h-5 w-5" /> },
         ];
@@ -64,13 +69,11 @@ const Sidebar = ({ userRole }: SidebarProps) => {
     }
   };
 
-  const navItems = getNavItems();
-
   return (
     <div className="fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-red-600 overflow-y-auto z-30">
       <div className="p-4">
         <div className="space-y-1">
-          {navItems.map((item) => (
+          {getNavItems().map((item) => (
             <NavLink
               key={item.path}
               to={item.path}

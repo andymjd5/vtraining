@@ -154,3 +154,4 @@ export interface CompanyFile {
   uploadedAt: any;
   uploadedBy: string | null;
 }
+export * from './ticket';

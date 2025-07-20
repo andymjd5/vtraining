@@ -51,6 +51,13 @@ service firebase.storage {
         request.resource.size < 5 * 1024 * 1024 && // 5MB limit
         request.resource.contentType.matches('image/(jpeg|png|gif)');
     }
+// Library files
+    match /library/{fileName} {
+      // Allow read access to any authenticated user.
+      // The security is enforced by Firestore rules, which determine who gets the download URL.
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
     
     // Default rule - deny everything else
     match /{allPaths=**} {

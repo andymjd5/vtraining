@@ -26,6 +26,8 @@ const CourseView = lazy(() => import('./pages/student/CourseView'));
 const QuizView = lazy(() => import('./pages/student/QuizView'));
 const Certificates = lazy(() => import('./pages/student/Certificates'));
 const Profile = lazy(() => import('./pages/student/Profile'));
+const StudentSupport = lazy(() => import('./pages/student/Support'));
+const StudentLibraryPage = lazy(() => import('./pages/student/Library'));
 
 // Company admin pages
 const CompanyAdminDashboard = lazy(() => import('./pages/company-admin/Dashboard'));
@@ -33,6 +35,8 @@ const CompanyUserManagement = lazy(() => import('./pages/company-admin/UserManag
 const AssignedCourses = lazy(() => import('./pages/company-admin/AssignedCourses'));
 const CompanyReports = lazy(() => import('./pages/company-admin/Reports'));
 const CompanySettings = lazy(() => import('./pages/company-admin/Settings'));
+const CompanyTicketManagement = lazy(() => import('./pages/company-admin/TicketManagement'));
+const CompanyLibraryPage = lazy(() => import('./pages/company-admin/Library'));
 
 // Super admin pages
 const SuperAdminDashboard = lazy(() => import('./pages/super-admin/Dashboard'));
@@ -42,6 +46,8 @@ const AdminUserManagement = lazy(() => import('./pages/super-admin/UserManagemen
 const CourseAssignment = lazy(() => import('./pages/super-admin/CourseAssignment'));
 const SuperAdminReports = lazy(() => import('./pages/super-admin/Reports'));
 const SuperAdminSettings = lazy(() => import('./pages/super-admin/Settings'));
+const SuperAdminTicketManagement = lazy(() => import('./pages/super-admin/TicketManagement'));
+const LibraryManagementPage = lazy(() => import('./pages/super-admin/LibraryManagement'));
 
 function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -120,6 +126,8 @@ function App() {
             <Route path="quiz/:quizId" element={<QuizView />} />
             <Route path="certificates" element={<Certificates />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="support" element={<StudentSupport />} />
+            <Route path="library" element={<StudentLibraryPage />} />
           </Route>
 
           {/* Legacy dashboard route redirect */}
@@ -155,6 +163,8 @@ function App() {
             <Route path="assigned-courses" element={<AssignedCourses />} />
             <Route path="reports" element={<CompanyReports />} />
             <Route path="settings" element={<CompanySettings />} />
+            <Route path="tickets" element={<CompanyTicketManagement />} />
+            <Route path="library" element={<CompanyLibraryPage />} />
           </Route>
 
           {/* Super admin routes */}
@@ -171,9 +181,11 @@ function App() {
             <Route path="companies" element={<CompanyManagement />} />
             <Route path="courses" element={<CourseManagement />} />
             <Route path="courses/assign" element={<CourseAssignment />} />
+            <Route path="library" element={<LibraryManagementPage />} />
             <Route path="users" element={<AdminUserManagement />} />
             <Route path="reports" element={<SuperAdminReports />} />
             <Route path="settings" element={<SuperAdminSettings />} />
+            <Route path="tickets" element={<SuperAdminTicketManagement />} />
           </Route>
 
           {/* Catch-all */}

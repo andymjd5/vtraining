@@ -142,5 +142,24 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update, delete: if isSuperAdmin();
     }
+// Library Resources collection
+    match /library_resources/{resourceId} {
+      allow read: if isSuperAdmin() ||
+                   (isCompanyAdmin() && (
+                     resource.data.assignedToCompanies.hasAny([get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId]) ||
+                     resource.data.assignedToCompanies.hasAny(['all'])
+                   ));
+      // Les étudiants n'ont pas besoin d'un accès direct, les fonctions backend s'en chargent.
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // Company Library collection
+    match /company_library/{docId} {
+      allow read: if isSuperAdmin() ||
+                   (isCompanyAdmin() && belongsToCompany(resource.data.companyId)) ||
+                   (isStudent() && belongsToCompany(resource.data.companyId) && resource.data.assignedToStudents.hasAny([request.auth.uid]));
+      allow create, update: if isCompanyAdmin() && belongsToCompany(request.resource.data.companyId);
+      allow delete: if false;
+    }
   }
 }

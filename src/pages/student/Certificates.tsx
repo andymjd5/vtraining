@@ -1,12 +1,9 @@
 import React from 'react';
+// Chemin à adapter selon ton projet
+import Certificates from '../../components/ui/Certificates'; 
 
-const Certificates = () => {
-  return (
-    <div>
-      <h2>Certificats</h2>
-      <p>Ceci est une page temporaire pour les certificats.</p>
-    </div>
-  );
+const CertificatesPage = () => {
+  return <Certificates />;
 };
 
-export default Certificates;
+export default CertificatesPage;
