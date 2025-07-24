@@ -176,9 +176,16 @@ export const userService = {
         users.push(userData);
       }
 
+      // Tri robuste qui gère Firebase Timestamps, strings ISO, et undefined
       users.sort((a, b) => {
-        const dateA = a.createdAt || new Date(0);
-        const dateB = b.createdAt || new Date(0);
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        
+        // Vérifier que les dates sont valides
+        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+          return 0; // Garde l'ordre actuel si les dates sont invalides
+        }
+        
         return dateB.getTime() - dateA.getTime();
       });
 

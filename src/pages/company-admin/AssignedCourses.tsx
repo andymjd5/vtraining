@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../hooks/useAuth';
-import { BookCheck, Users, Clock, User, CheckCircle, Plus, UserX } from 'lucide-react';
+import { courseService } from '../../services/courseService';
+import { BookCheck, Users, Clock, User, CheckCircle, Plus, UserX, X } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { useToast } from '../../hooks/useToast';
@@ -63,16 +64,12 @@ const AssignedCourses = () => {
 
   const fetchAssignedCourses = async () => {
     try {
-      const q = query(
-        collection(db, 'courses'),
-        where('assignedTo', 'array-contains', user!.companyId!)
-      );
-      const querySnapshot = await getDocs(q);
-      const coursesData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Course[];
-      setCourses(coursesData);
+      if (!user?.companyId) {
+        throw new Error('Company ID is required');
+      }
+      const coursesData = await courseService.getCoursesByCompany(user.companyId);
+      console.log('Fetched assigned courses:', coursesData);
+      setCourses(coursesData || []);
     } catch (error) {
       console.error('Error fetching assigned courses:', error);
       showError('Erreur lors du chargement des cours');
@@ -83,9 +80,12 @@ const AssignedCourses = () => {
 
   const fetchStudents = async () => {
     try {
+      if (!user?.companyId) {
+        throw new Error('Company ID is required');
+      }
       const q = query(
         collection(db, 'users'),
-        where('companyId', '==', user!.companyId!),
+        where('companyId', '==', user.companyId),
         where('role', '==', 'STUDENT')
       );
       const querySnapshot = await getDocs(q);
@@ -94,18 +94,22 @@ const AssignedCourses = () => {
         ...doc.data()
       })) as Student[];
       console.log('Fetched students:', studentsData);
-      setStudents(studentsData);
+      setStudents(studentsData || []);
     } catch (error) {
       console.error('Error fetching students:', error);
+      showError('Erreur lors du chargement des étudiants');
     }
   };
 
   const fetchEnrolledStudents = async (courseId: string) => {
     try {
+      if (!user?.companyId) {
+        throw new Error('Company ID is required');
+      }
       const q = query(
         collection(db, 'enrollments'),
         where('courseId', '==', courseId),
-        where('companyId', '==', user!.companyId!)
+        where('companyId', '==', user.companyId)
       );
       const querySnapshot = await getDocs(q);
       const enrollments = querySnapshot.docs.map(doc => ({
@@ -156,7 +160,7 @@ const AssignedCourses = () => {
   };
 
   const assignCourseToStudents = async () => {
-    if (!selectedCourse || selectedStudents.length === 0) return;
+    if (!selectedCourse || selectedStudents.length === 0 || !user?.companyId) return;
 
     setAssigning(true);
     try {
@@ -166,7 +170,7 @@ const AssignedCourses = () => {
         await setDoc(enrollmentRef, {
           userId: studentId,
           courseId: selectedCourse.id,
-          companyId: user!.companyId,
+          companyId: user.companyId,
           status: 'NOT_STARTED',
           progress: 0,
           enrolledAt: new Date(),
@@ -195,7 +199,7 @@ const AssignedCourses = () => {
   };
 
   const unassignCourseFromStudents = async () => {
-    if (!selectedCourse || selectedEnrolledStudents.length === 0) return;
+    if (!selectedCourse || selectedEnrolledStudents.length === 0 || !user?.companyId) return;
 
     setUnassigning(true);
     try {
@@ -206,7 +210,7 @@ const AssignedCourses = () => {
           collection(db, 'enrollments'),
           where('userId', '==', studentId),
           where('courseId', '==', selectedCourse.id),
-          where('companyId', '==', user!.companyId!)
+          where('companyId', '==', user.companyId!)
         );
         const enrollmentSnapshot = await getDocs(enrollmentQuery);
 
@@ -243,6 +247,15 @@ const AssignedCourses = () => {
   const unassignFromAllStudents = () => {
     setSelectedEnrolledStudents(enrolledStudents.map(s => s.id));
   };
+
+  // Early return if user is not available or loading
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-600">Authentification requise</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -297,7 +310,7 @@ const AssignedCourses = () => {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center text-sm text-gray-500">
                     <User className="h-4 w-4 mr-2" />
-                    {course.instructor.name}
+                    {course.instructor?.name || 'Instructeur non défini'}
                   </div>
                   <div className="flex items-center text-sm text-gray-500">
                     <Clock className="h-4 w-4 mr-2" />
@@ -357,7 +370,7 @@ const AssignedCourses = () => {
                   onClick={() => setShowAssignModal(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  {/* <X className="h-6 w-6" /> */}
+                  <X className="h-6 w-6" />
                 </button>
               </div>
             </div>
@@ -447,7 +460,7 @@ const AssignedCourses = () => {
                   onClick={() => setShowUnassignModal(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  {/* <X className="h-6 w-6" /> */}
+                  <X className="h-6 w-6" />
                 </button>
               </div>
             </div>

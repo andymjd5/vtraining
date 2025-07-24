@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Ticket } from '../../types';
-import { getAllTicketsForSuperAdmin } from '../../services/ticketService';
+import { getTickets } from '../../services/ticketService';
 import TicketList from '../../components/tickets/TicketList';
 import TicketDetails from '../../components/tickets/TicketDetails';
 import { useToast } from '../../hooks/useToast';
@@ -16,7 +16,7 @@ const TicketManagement = () => {
   const fetchTickets = useCallback(async () => {
     setLoading(true);
     try {
-      const fetchedTickets = await getAllTicketsForSuperAdmin();
+      const fetchedTickets = await getTickets({ role: 'super-admin' });
       setTickets(fetchedTickets);
     } catch (err) {
       showError('Erreur lors du chargement des tickets.');
@@ -35,6 +35,7 @@ const TicketManagement = () => {
 
   const handleBack = () => {
     setSelectedTicketId(null);
+    fetchTickets(); // Refresh list in case of updates
   };
 
   if (loading) {
@@ -45,7 +46,7 @@ const TicketManagement = () => {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Gestion des Tickets</h1>
       {selectedTicketId ? (
-        <TicketDetails ticketId={selectedTicketId} onBack={handleBack} />
+        <TicketDetails ticketId={selectedTicketId} onBack={handleBack} isReadOnly={true} />
       ) : (
         <TicketList tickets={tickets} onSelectTicket={handleSelectTicket} />
       )}

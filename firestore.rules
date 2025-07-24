@@ -142,14 +142,26 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update, delete: if isSuperAdmin();
     }
-// Library Resources collection
+
+    // Progression détaillée utilisateur/cours
+    match /user_course_progress/{progressId} {
+      allow read, write: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isCompanyAdmin() && belongsToCompany(get(/databases/$(database)/documents/users/$(resource.data.userId)).data.companyId)) ||
+        isUserOwner(resource.data.userId)
+      );
+    }
+  }
+
+  // Library Resources collection
     match /library_resources/{resourceId} {
       allow read: if isSuperAdmin() ||
                    (isCompanyAdmin() && (
                      resource.data.assignedToCompanies.hasAny([get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId]) ||
                      resource.data.assignedToCompanies.hasAny(['all'])
-                   ));
-      // Les étudiants n'ont pas besoin d'un accès direct, les fonctions backend s'en chargent.
+                   )) ||
+                   (isStudent() &&
+                     resource.data.assignedToCompanies.hasAny([get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId]));
       allow create, update, delete: if isSuperAdmin();
     }
 
@@ -161,5 +173,29 @@ service cloud.firestore {
       allow create, update: if isCompanyAdmin() && belongsToCompany(request.resource.data.companyId);
       allow delete: if false;
     }
-  }
+// Tickets collection
+    match /tickets/{ticketId} {
+      // CREATE: Un étudiant peut créer un ticket pour sa propre entreprise.
+      allow create: if isStudent() && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+
+      // READ: 
+      // - Un étudiant peut lire ses propres tickets.
+      // - Un admin d'entreprise peut lire les tickets de son entreprise.
+      allow read: if (isStudent() && resource.data.userId == request.auth.uid) ||
+                    (isCompanyAdmin() && belongsToCompany(resource.data.companyId)) ||
+                    isSuperAdmin();
+
+      // UPDATE:
+      // - Un admin d'entreprise peut répondre ou clôturer un ticket de son entreprise.
+      // - Un étudiant peut répondre à son propre ticket.
+      // - Un admin peut mettre à jour un ticket de son entreprise.
+      allow update: if (isCompanyAdmin() && belongsToCompany(resource.data.companyId)) ||
+                      isSuperAdmin() ||
+                      (isStudent() && resource.data.userId == request.auth.uid);
+
+      // DELETE: Personne ne peut supprimer un ticket pour garder un historique.
+      allow delete: if false;
+    }
 }

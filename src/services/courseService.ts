@@ -339,17 +339,53 @@ export const courseService = {
    */
   async saveChaptersAndSections(courseId: string, chapters: ChapterWithSections[]): Promise<void> {
     try {
+      // 1. Récupérer les IDs existants dans Firestore
+      const [existingChaptersSnap, existingSectionsSnap, existingBlocksSnap] = await Promise.all([
+        getDocs(query(collection(db, 'chapters'), where('courseId', '==', courseId))),
+        getDocs(query(collection(db, 'sections'), where('courseId', '==', courseId))),
+        getDocs(query(collection(db, 'content_blocks'), where('courseId', '==', courseId)))
+      ]);
+
+      const existingChapterIds = existingChaptersSnap.docs.map(doc => doc.id);
+      const existingSectionIds = existingSectionsSnap.docs.map(doc => doc.id);
+      const existingBlockIds = existingBlocksSnap.docs.map(doc => doc.id);
+
+      // 2. Récupérer les IDs de la nouvelle structure
+      const newChapterIds = chapters.map(ch => ch.id);
+      const newSectionIds = chapters.flatMap(ch => ch.sections.map(sec => sec.id));
+      const newBlockIds = chapters.flatMap(ch => ch.sections.flatMap(sec => (sec.content || []).map(block => block.id)));
+
+      // 3. Déterminer les éléments à supprimer
+      const chaptersToDelete = existingChapterIds.filter(id => !newChapterIds.includes(id));
+      const sectionsToDelete = existingSectionIds.filter(id => !newSectionIds.includes(id));
+      const blocksToDelete = existingBlockIds.filter(id => !newBlockIds.includes(id));
+
+      // 4. Batch pour suppression et sauvegarde
       const batch = writeBatch(db);
+
+      // Suppression des blocs obsolètes
+      blocksToDelete.forEach(blockId => {
+        batch.delete(doc(db, 'content_blocks', blockId));
+      });
+      // Suppression des sections obsolètes
+      sectionsToDelete.forEach(sectionId => {
+        batch.delete(doc(db, 'sections', sectionId));
+      });
+      // Suppression des chapitres obsolètes
+      chaptersToDelete.forEach(chapterId => {
+        batch.delete(doc(db, 'chapters', chapterId));
+      });
 
       // Mettre à jour l'ordre des chapitres dans le cours
       const chaptersOrder = chapters.map(ch => ch.id);
       batch.update(doc(db, 'courses', courseId), {
         chaptersOrder,
         updatedAt: serverTimestamp()
-      });      // Sauvegarder chaque chapitre
+      });
+
+      // Sauvegarder chaque chapitre
       for (const chapter of chapters) {
         const chapterRef = doc(db, 'chapters', chapter.id);
-
         batch.set(chapterRef, cleanObjectForFirestore({
           id: chapter.id,
           courseId,
@@ -363,10 +399,10 @@ export const courseService = {
           sectionsOrder: chapter.sections.map(sec => sec.id),
           createdAt: chapter.createdAt || serverTimestamp(),
           updatedAt: serverTimestamp()
-        }));        // Sauvegarder les sections de ce chapitre
+        }));
+        // Sauvegarder les sections de ce chapitre
         for (const section of chapter.sections) {
           const sectionRef = doc(db, 'sections', section.id);
-
           batch.set(sectionRef, cleanObjectForFirestore({
             id: section.id,
             chapterId: chapter.id,
@@ -376,11 +412,13 @@ export const courseService = {
             contentBlocksOrder: section.content?.map(block => block.id) || [],
             createdAt: section.createdAt || serverTimestamp(),
             updatedAt: serverTimestamp()
-          }));// Sauvegarder les blocs de contenu de cette section
+          }));
+          // Sauvegarder les blocs de contenu de cette section
           if (section.content && section.content.length > 0) {
             for (const block of section.content) {
-              const blockRef = doc(db, 'content_blocks', block.id);              // Nettoyer l'objet media pour éviter les valeurs undefined
-              const cleanMedia = block.media ? cleanObjectForFirestore(block.media) : null; batch.set(blockRef, cleanObjectForFirestore({
+              const blockRef = doc(db, 'content_blocks', block.id);
+              const cleanMedia = block.media ? cleanObjectForFirestore(block.media) : null;
+              batch.set(blockRef, cleanObjectForFirestore({
                 id: block.id,
                 sectionId: section.id,
                 chapterId: chapter.id,

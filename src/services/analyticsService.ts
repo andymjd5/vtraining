@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { userService } from './userService';
 
 export const analyticsService = {
   // Company Statistics
@@ -136,8 +137,9 @@ export const analyticsService = {
 
         // Get progress tracking - CORRECTION: nom de collection en minuscule
         const progressQuery = query(
-          collection(db, 'progress_tracking'),
-          where('enrollmentId', '==', enrollmentDoc.id)
+          collection(db, 'user_course_progress'),
+          where('userId', '==', userId),
+          where('courseId', '==', enrollment.courseId)
         );
         const progressSnapshot = await getDocs(progressQuery);
 
@@ -241,8 +243,9 @@ export const analyticsService = {
 
         // Get progress for this enrollment - CORRECTION: nom de collection en minuscule
         const progressQuery = query(
-          collection(db, 'progress_tracking'),
-          where('enrollmentId', '==', enrollmentDoc.id)
+          collection(db, 'user_course_progress'),
+          where('userId', '==', enrollment.userId),
+          where('courseId', '==', courseId)
         );
         const progressSnapshot = await getDocs(progressQuery);
         
@@ -405,5 +408,32 @@ export const analyticsService = {
       console.error('Error exporting to Excel:', error);
       throw error;
     }
-  }
+  },
+  async getCompanyStudentProgress(companyId: string) {
+    if (!companyId) {
+      return [];
+    }
+
+    try {
+      const students = await userService.getStudentsByCompany(companyId);
+      
+      const allProgressData = [];
+
+      for (const student of students) {
+        const studentProgress = await this.getUserProgress(student.id);
+        if (studentProgress.length > 0) {
+          allProgressData.push({
+            studentId: student.id,
+            studentName: student.name || student.displayName || student.email,
+            courses: studentProgress,
+          });
+        }
+      }
+
+      return allProgressData;
+    } catch (error) {
+      console.error('Error fetching company student progress:', error);
+      return [];
+    }
+  },
 };

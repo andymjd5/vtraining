@@ -6,6 +6,7 @@ import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
 import LoadingScreen from './components/ui/LoadingScreen';
 import ToastContainer from './components/ui/ToastContainer';
 import { useToast } from './hooks/useToast';
+import { SidebarProvider } from './contexts/SidebarContext';
 import { UserRole } from './types';
 
 // Lazy loaded components
@@ -23,10 +24,11 @@ const CompanyAdminLogin = lazy(() => import('./pages/auth/CompanyAdminLogin'));
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
 const StudentCourses = lazy(() => import('./pages/student/Courses'));
 const CourseView = lazy(() => import('./pages/student/CourseView'));
+const CoursePreview = lazy(() => import('./pages/student/CoursePreview'));
 const QuizView = lazy(() => import('./pages/student/QuizView'));
 const Certificates = lazy(() => import('./pages/student/Certificates'));
 const Profile = lazy(() => import('./pages/student/Profile'));
-const StudentSupport = lazy(() => import('./pages/student/Support'));
+const StudentTickets = lazy(() => import('./pages/student/StudentTickets'));
 const StudentLibraryPage = lazy(() => import('./pages/student/Library'));
 
 // Company admin pages
@@ -35,7 +37,7 @@ const CompanyUserManagement = lazy(() => import('./pages/company-admin/UserManag
 const AssignedCourses = lazy(() => import('./pages/company-admin/AssignedCourses'));
 const CompanyReports = lazy(() => import('./pages/company-admin/Reports'));
 const CompanySettings = lazy(() => import('./pages/company-admin/Settings'));
-const CompanyTicketManagement = lazy(() => import('./pages/company-admin/TicketManagement'));
+const CompanyAdminTickets = lazy(() => import('./pages/company-admin/CompanyAdminTickets'));
 const CompanyLibraryPage = lazy(() => import('./pages/company-admin/Library'));
 
 // Super admin pages
@@ -63,7 +65,7 @@ function App() {
   }
 
   return (
-    <>
+    <SidebarProvider>
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
@@ -123,10 +125,11 @@ function App() {
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="courses" element={<StudentCourses />} />
             <Route path="courses/:courseId" element={<CourseView />} />
+            <Route path="courses/:courseId/preview" element={<CoursePreview />} />
             <Route path="quiz/:quizId" element={<QuizView />} />
             <Route path="certificates" element={<Certificates />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="support" element={<StudentSupport />} />
+            <Route path="tickets" element={<StudentTickets />} />
             <Route path="library" element={<StudentLibraryPage />} />
           </Route>
 
@@ -163,7 +166,7 @@ function App() {
             <Route path="assigned-courses" element={<AssignedCourses />} />
             <Route path="reports" element={<CompanyReports />} />
             <Route path="settings" element={<CompanySettings />} />
-            <Route path="tickets" element={<CompanyTicketManagement />} />
+            <Route path="tickets" element={<CompanyAdminTickets />} />
             <Route path="library" element={<CompanyLibraryPage />} />
           </Route>
 
@@ -180,7 +183,7 @@ function App() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="companies" element={<CompanyManagement />} />
             <Route path="courses" element={<CourseManagement />} />
-            <Route path="courses/assign" element={<CourseAssignment />} />
+            <Route path="assignments" element={<CourseAssignment />} />
             <Route path="library" element={<LibraryManagementPage />} />
             <Route path="users" element={<AdminUserManagement />} />
             <Route path="reports" element={<SuperAdminReports />} />
@@ -192,7 +195,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-    </>
+    </SidebarProvider>
   );
 }
 

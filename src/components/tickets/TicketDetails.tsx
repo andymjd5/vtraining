@@ -1,26 +1,27 @@
 // src/components/tickets/TicketDetails.tsx
 
-import { useEffect, useState } from 'react';
-import { Ticket, TicketComment, TicketStatus, TicketPriority } from '../../types';
-import { getTicketById, updateTicket, addCommentToTicket } from '../../services/ticketService';
-import { useAuth } from '../../hooks/useAuth';
+import { useState, useEffect } from 'react';
+import { Ticket } from '../../types';
+import { getTicketById, respondToTicket, closeTicket } from '../../services/ticketService';
 import { useToast } from '../../hooks/useToast';
+import Button from '../ui/Button';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import Badge from '../ui/Badge';
-import Button from '../ui/Button';
+import { useAuth } from '../../hooks/useAuth';
 
 interface TicketDetailsProps {
   ticketId: string;
   onBack: () => void;
+  isReadOnly?: boolean;
 }
 
-const TicketDetails = ({ ticketId, onBack }: TicketDetailsProps) => {
+const TicketDetails = ({ ticketId, onBack, isReadOnly = false }: TicketDetailsProps) => {
   const { user } = useAuth();
-  const { success, error: showError } = useToast();
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
-  const [comment, setComment] = useState('');
+  const [response, setResponse] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { success, error: showError } = useToast();
 
   useEffect(() => {
     const fetchTicket = async () => {
@@ -37,73 +38,80 @@ const TicketDetails = ({ ticketId, onBack }: TicketDetailsProps) => {
     fetchTicket();
   }, [ticketId, showError]);
 
-  const handleUpdateTicket = async (updates: Partial<Ticket>) => {
+  const handleRespond = async () => {
+    if (!ticket || !response.trim() || !user) return;
+    setIsSubmitting(true);
+    try {
+      await respondToTicket(ticket.id, response, user.id);
+      success('Réponse envoyée avec succès.');
+      setResponse('');
+      // Re-fetch ticket to show the new response
+      const updatedTicket = await getTicketById(ticketId);
+      setTicket(updatedTicket);
+    } catch (err) {
+      showError("Erreur lors de l'envoi de la réponse.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClose = async () => {
     if (!ticket) return;
     try {
-      await updateTicket(ticket.id, updates);
-      setTicket({ ...ticket, ...updates });
-      success('Ticket mis à jour.');
+      await closeTicket(ticket.id);
+      success('Ticket clôturé.');
+      onBack(); // Go back to the list after closing
     } catch (err) {
-      showError('Erreur lors de la mise à jour.');
+      showError('Erreur lors de la clôture du ticket.');
     }
   };
 
-  const handleAddComment = async () => {
-    if (!ticket || !comment.trim() || !user) return;
-    try {
-      await addCommentToTicket(ticket.id, comment, user.id);
-      const newComment: TicketComment = {
-        id: new Date().toISOString(), // Temporary ID
-        content: comment,
-        createdBy: user.id,
-        createdAt: new Date(),
-      };
-      setTicket({ ...ticket, comments: [...(ticket.comments || []), newComment] });
-      setComment('');
-      success('Commentaire ajouté.');
-    } catch (err) {
-      showError("Erreur lors de l'ajout du commentaire.");
-    }
-  };
+  if (loading) {
+    return <div>Chargement du ticket...</div>;
+  }
 
-  if (loading) return <div>Chargement...</div>;
-  if (!ticket) return <div>Ticket non trouvé.</div>;
+  if (!ticket) {
+    return <div>Ticket non trouvé.</div>;
+  }
 
   return (
-    <div>
-      <Button onClick={onBack} variant="secondary" className="mb-4">Retour</Button>
-      
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">{ticket.title}</h3>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">Détails du ticket</p>
-        </div>
-        <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
-          <dl className="sm:divide-y sm:divide-gray-200">
-            {/* ... Other details ... */}
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Description</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{ticket.description}</dd>
-            </div>
-          </dl>
-        </div>
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <Button onClick={onBack} variant="secondary" className="mb-4">Retour à la liste</Button>
+      <h2 className="text-2xl font-bold mb-2">{ticket.subject}</h2>
+      <div className="text-sm text-gray-600 mb-4">
+        <p>De: {ticket.userName} ({ticket.userEmail})</p>
+        <p>Entreprise: {ticket.companyName || 'Non spécifiée'}</p>
+        <p>Reçu le: {ticket.createdAt && format(ticket.createdAt.toDate(), 'd MMM yyyy à HH:mm', { locale: fr })}</p>
       </div>
+      <p className="text-gray-800 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">{ticket.message}</p>
 
-      {/* Comments Section */}
-      <div className="mt-6">
-        <h4 className="text-lg font-medium">Commentaires</h4>
-        {/* ... Comments list ... */}
-        <div className="mt-4">
-          <textarea 
-            rows={3} 
-            className="shadow-sm block w-full focus:ring-blue-500 focus:border-blue-500 sm:text-sm border border-gray-300 rounded-md"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Ajouter un commentaire..."
-          />
-          <Button onClick={handleAddComment} className="mt-2">Commenter</Button>
+      {ticket.responseMessage && (
+        <div className="mt-6 border-t pt-4">
+          <h3 className="font-semibold text-lg">Réponse</h3>
+          <p className="text-xs text-gray-500 mb-1">
+            Par: {ticket.respondedBy} le {ticket.responseAt && format(ticket.responseAt.toDate(), 'd MMM yyyy à HH:mm', { locale: fr })}
+          </p>
+          <p className="text-gray-800 whitespace-pre-wrap bg-blue-50 p-4 rounded-md mt-2">{ticket.responseMessage}</p>
         </div>
-      </div>
+      )}
+
+      {ticket.status !== 'clos' && !isReadOnly && (
+        <div className="mt-6">
+          <textarea
+            rows={5}
+            value={response}
+            onChange={(e) => setResponse(e.target.value)}
+            className="w-full p-2 border rounded"
+            placeholder="Votre réponse..."
+          />
+          <div className="flex justify-end space-x-2 mt-2">
+            <Button onClick={handleRespond} disabled={isSubmitting || !response.trim()}>
+              {isSubmitting ? 'Envoi...' : 'Répondre'}
+            </Button>
+            <Button onClick={handleClose} variant="error">Clôturer</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

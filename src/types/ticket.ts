@@ -2,31 +2,25 @@
 
 import { UserRole } from './index';
 
-export enum TicketStatus {
-  OPEN = 'OPEN',
-  IN_PROGRESS = 'IN_PROGRESS',
-  CLOSED = 'CLOSED',
-}
-
-export enum TicketPriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-}
+export type TicketStatus = 'ouvert' | 'répondu' | 'clos';
 
 export interface Ticket {
   id: string;
-  title: string;
-  description: string;
+  companyId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  subject: string;
+  message: string;
+  createdAt: any; // Firestore Timestamp
   status: TicketStatus;
-  priority: TicketPriority;
-  createdBy: string; // User ID
-  createdByUserRole: UserRole;
-  companyId?: string;
-  assignedTo?: string; // User ID of admin
-  createdAt: any;
-  updatedAt?: any;
-  comments?: TicketComment[];
+  responseMessage?: string;
+  responseAt?: any; // Firestore Timestamp
+  respondedBy?: string; // admin UID
+  companyName?: string;
+  studentHasUnreadUpdate?: boolean;
+  adminHasUnreadMessage?: boolean;
+  adminReadAt?: any; // Firestore Timestamp
 }
 
 export interface TicketComment {

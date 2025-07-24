@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../lib/firebase';
 import CompanyFileManager from '../../components/storage/CompanyFileManager';
+
 import { motion } from 'framer-motion';
 
 interface Course {
@@ -155,11 +156,16 @@ const Dashboard: React.FC = () => {
   });
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalState, setModalState] = useState({
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    data: any[];
+    type: 'courses' | 'completed' | 'inProgress' | 'timeSpent';
+  }>({
     isOpen: false,
     title: '',
     data: [],
-    type: 'courses' as 'courses' | 'completed' | 'inProgress' | 'timeSpent'
+    type: 'courses'
   });
 
   const getInitials = (name: string): string => {
@@ -500,6 +506,8 @@ const Dashboard: React.FC = () => {
           </motion.div>
         </div>
       </div>
+
+
 
       {/* Aperçu des cours récents */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

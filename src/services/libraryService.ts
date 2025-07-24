@@ -98,6 +98,19 @@ export const assignResourceToStudents = async (resourceId: string, studentIds: s
       assignedToStudents: studentIds,
     });
   }
+
+  // Ensure the resource is marked as assigned to the company
+  const resourceRef = doc(db, 'library_resources', resourceId);
+  const resourceDoc = await getDoc(resourceRef);
+  if (resourceDoc.exists()) {
+    const resourceData = resourceDoc.data();
+    const assignedToCompanies = resourceData.assignedToCompanies || [];
+    if (!assignedToCompanies.includes(companyId)) {
+      await updateDoc(resourceRef, {
+        assignedToCompanies: [...assignedToCompanies, companyId]
+      });
+    }
+  }
 };
 
 export const getStudentAssignedResources = async (studentId: string, companyId: string): Promise<LibraryResource[]> => {
@@ -126,3 +139,27 @@ export const getResourceAssignmentsForCompany = async (resourceId: string, compa
     }
     return snapshot.docs[0].data().assignedToStudents || [];
 }
+
+export const getCompanyResourcesWithAssignments = async (companyId: string): Promise<{
+  resource: LibraryResource;
+  assignedStudents: string[];
+}[]> => {
+  try {
+    // Récupérer toutes les ressources assignées à cette entreprise
+    const companyResources = await getCompanyAssignedResources(companyId);
+    
+    // Récupérer les assignations pour chaque ressource
+    const assignmentsPromises = companyResources.map(async (resource) => {
+      const assignedStudents = await getResourceAssignmentsForCompany(resource.id, companyId);
+      return {
+        resource,
+        assignedStudents
+      };
+    });
+    
+    return await Promise.all(assignmentsPromises);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des ressources avec assignations:', error);
+    throw error;
+  }
+};

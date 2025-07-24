@@ -229,3 +229,15 @@ export interface CourseMigrationResult {
     sections: Section[];
     contentBlocks: ContentBlock[];
 }
+
+/**
+ * Catégorie de cours
+ */
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  order?: number;
+}

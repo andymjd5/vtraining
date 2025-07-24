@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getLibraryResources, assignResourceToCompanies } from '../../services/libraryService';
+import { getLibraryResources } from '../../services/libraryService';
 import { LibraryResource } from '../../types/library';
+import { Company } from '../../types';
+import { db } from '../../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { UploadResourceForm } from '../../components/library/UploadResourceForm';
 import { LibraryResourceList } from '../../components/library/LibraryResourceList';
 import { AssignResourceModal } from '../../components/library/AssignResourceModal';
@@ -8,28 +11,36 @@ import LoadingScreen from '../../components/ui/LoadingScreen';
 
 const LibraryManagementPage: React.FC = () => {
   const [resources, setResources] = useState<LibraryResource[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<LibraryResource | null>(null);
 
-  const fetchResources = useCallback(async () => {
+  const fetchResourcesAndCompanies = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedResources = await getLibraryResources();
+      const resourcesPromise = getLibraryResources();
+      const companiesPromise = getDocs(collection(db, 'companies'));
+      
+      const [fetchedResources, companySnapshot] = await Promise.all([resourcesPromise, companiesPromise]);
+      
       setResources(fetchedResources);
+      const companyList = companySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
+      setCompanies(companyList);
+
     } catch (error) {
-      console.error("Erreur lors de la récupération des ressources: ", error);
+      console.error("Erreur lors de la récupération des données: ", error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchResources();
-  }, [fetchResources]);
+    fetchResourcesAndCompanies();
+  }, [fetchResourcesAndCompanies]);
 
   const handleUploadSuccess = (newResource: LibraryResource) => {
-    fetchResources();
+    fetchResourcesAndCompanies();
     setSelectedResource(newResource);
     setIsAssignModalOpen(true);
   };
@@ -45,7 +56,7 @@ const LibraryManagementPage: React.FC = () => {
   };
 
   const handleAssignment = () => {
-    fetchResources();
+    fetchResourcesAndCompanies();
     closeAssignModal();
   };
 
@@ -61,7 +72,7 @@ const LibraryManagementPage: React.FC = () => {
           <UploadResourceForm onUploadSuccess={handleUploadSuccess} />
         </div>
         <div className="md:col-span-2">
-          <LibraryResourceList resources={resources} onAssignClick={openAssignModal} />
+          <LibraryResourceList resources={resources} companies={companies} onAssignClick={openAssignModal} />
         </div>
       </div>
       {selectedResource && (
